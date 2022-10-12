@@ -8,45 +8,83 @@
     tools:context=".ui.main.MainFragment">
 
     <LinearLayout
-        android:id="@+id/ll_video_view"
+        android:id="@+id/ll_local_video"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         android:layout_width="match_parent"
         android:layout_height="200dp"
-        android:layout_weight="3"
+        android:layout_weight="2"
         android:orientation="horizontal" >
-        <LinearLayout
+        <FrameLayout
             android:id="@+id/fl_local_meta"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_gravity="center"
-            android:orientation="horizontal"
-            android:background="@color/teal_200"
-            android:autofillHints="local preview"
-            />
+            android:background="@color/teal_200" />
 
-        <LinearLayout
-            android:id="@+id/fl_remote_video"
+        <FrameLayout
+            android:id="@+id/fl_local"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_gravity="center"
-            android:orientation="horizontal"
-            android:background="@color/colorGrey"
-            android:autofillHints="remote view"
-            />
-        <LinearLayout
-            android:id="@+id/fl_local_preview"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_gravity="center"
-            android:orientation="horizontal"
-            android:background="@color/colorAccent"
-            android:autofillHints="remote view"
-            />
+            android:background="@color/teal_700" />
     </LinearLayout>
+    <LinearLayout
+        android:id="@+id/ll_remote_video"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/ll_local_video"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_weight="2"
+        android:orientation="horizontal" >
+        <FrameLayout
+            android:id="@+id/fl_remote_meta"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@color/purple_200" />
+
+        <FrameLayout
+            android:id="@+id/fl_remote"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@color/purple_500" />
+    </LinearLayout>
+
+<!--    <FrameLayout-->
+<!--        android:id="@+id/fl_local"-->
+<!--        android:layout_weight="1"-->
+<!--        android:layout_width="0dp"-->
+<!--        android:layout_height="200dp"-->
+<!--        app:layout_constraintLeft_toLeftOf="parent"-->
+<!--        app:layout_constraintTop_toTopOf="parent"-->
+<!--        android:background="@color/teal_200" />-->
+
+<!--    <FrameLayout-->
+<!--        android:id="@+id/fl_local_meta"-->
+<!--        android:layout_weight="2"-->
+<!--        android:layout_width="0dp"-->
+<!--        android:layout_height="200dp"-->
+<!--        app:layout_constraintRight_toRightOf="parent"-->
+<!--        app:layout_constraintTop_toTopOf="parent"-->
+<!--        android:background="@color/teal_700" />-->
+
+<!--    <FrameLayout-->
+<!--        android:id="@+id/fl_remote"-->
+<!--        android:layout_width="200dp"-->
+<!--        android:layout_height="200dp"-->
+<!--        app:layout_constraintLeft_toLeftOf="parent"-->
+<!--        app:layout_constraintTop_toBottomOf="@id/fl_local"-->
+<!--        android:background="@color/purple_200" />-->
+
+<!--    <FrameLayout-->
+<!--        android:id="@+id/fl_remote_meta"-->
+<!--        android:layout_width="200dp"-->
+<!--        android:layout_height="200dp"-->
+<!--        app:layout_constraintRight_toRightOf="parent"-->
+<!--        app:layout_constraintTop_toBottomOf="@id/fl_local_meta"-->
+<!--        android:background="@color/purple_500" />-->
 
     <LinearLayout
         android:id="@+id/ll_join"

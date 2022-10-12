@@ -21,7 +21,6 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import com.metabolt.MTBServiceConfig;
@@ -33,11 +32,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 import io.agora.api.example.R;
@@ -57,7 +54,6 @@ import io.agora.rtc.IMetadataObserver;
 import io.agora.rtc.IRtcEngineEventHandler;
 import io.agora.rtc.IVideoFrameObserver;
 import io.agora.rtc.RtcEngine;
-import io.agora.rtc.RtcEngineConfig;
 import io.agora.rtc.audio.AudioParams;
 import io.agora.rtc.models.ChannelMediaOptions;
 import io.agora.rtc.models.DataStreamConfig;
@@ -69,7 +65,10 @@ import static io.agora.rtc.video.VideoCanvas.RENDER_MODE_HIDDEN;
 import static io.agora.rtc.video.VideoEncoderConfiguration.STANDARD_BITRATE;
 import static io.agora.rtc.video.VideoEncoderConfiguration.VD_640x360;
 
-public class MainFragment extends Fragment implements View.OnClickListener, TokenUtils.OnTokenListener, DownloadUtil.OnDownloadListener, IMetaFragmentHandler {
+public class MainFragment extends Fragment implements View.OnClickListener,
+    TokenUtils.OnTokenListener,
+    DownloadUtil.OnDownloadListener,
+    IMetaFragmentHandler {
   private static final String TAG = "MainFragment";
   private MainViewModel mViewModel;
 
@@ -77,12 +76,15 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
   private final int PLAY_MUSIC_PLAY = 1;
   private final int PLAY_MUSIC_PAUSE = 2;
   private boolean audioMixing = false;
-  private int mAudioStreamId = 0;
-  private LinearLayout fl_local, fl_remote, fl_local_preview;
+  private int mLocalAudioStreamId = 0;
+  private int mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;
+  private boolean mIsRemoteVideoViewNeedShow = false;
+  private boolean mIsRemoteMetaViewNeedShow = false;
+  private String mRemoteUid;
+  private FrameLayout fl_local_meta, fl_local, fl_remote_meta, fl_remote;
   private Button btn_join, btn_req_token, btn_play_music;
   private EditText et_uid;
   private EditText et_channel;
-  private boolean bUseAgora = false; // 是否启用agora
   private RtcEngine engine;
   private boolean isUserJoined = false;
   private int playMusicState = PLAY_MUSIC_IDLE;
@@ -99,8 +101,8 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
   private final String kLipSyncFileName = "lipsync";
   private final String kConfigJsonFileName = "/lipsync/config.json";
 
-  private final String kRoleModelFileMale = "male_role";
-  private final String kRoleModelFileFemale = "female_role";
+  private final String kRoleModelMale = "male_role";
+  private final String kRoleModelFemale = "female_role";
 
   private final String kDanceResourceUrl = "https://test-rtcapm.duowan.cn/apm-admin/video?fileName=new_dance.zip";
   private final String kBeatAnimationResourceUrl = "https://test-rtcapm.duowan.cn/apm-admin/video?fileName=beat.zip";
@@ -133,14 +135,12 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
     btn_req_token.setOnClickListener(this);
     btn_play_music.setOnClickListener(this);
     et_uid = view.findViewById(R.id.et_uid);
-    //Random random = new Random();
-    //int uid = random.nextInt(100000) + 100000;
-    int uid = ThreadLocalRandom.current().nextInt(100000, 999999);
-    et_uid.setText(String.valueOf(uid));
+    et_uid.setText(String.valueOf(ThreadLocalRandom.current().nextInt(100000, 999999)));
     et_channel = view.findViewById(R.id.et_channel);
-    fl_local = view.findViewById(R.id.fl_local_meta);
-    fl_remote = view.findViewById(R.id.fl_remote_video);
-    fl_local_preview = view.findViewById(R.id.fl_local_preview);
+    fl_local_meta = view.findViewById(R.id.fl_local_meta);
+    fl_local = view.findViewById(R.id.fl_local);
+    fl_remote_meta = view.findViewById(R.id.fl_remote_meta);
+    fl_remote = view.findViewById(R.id.fl_remote);
   }
 
   @Override
@@ -160,17 +160,10 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
        *              How to get the App ID</a>
        * @param handler IRtcEngineEventHandler is an abstract class providing default implementation.
        *                The SDK uses this class to report to the app on SDK runtime events.*/
-//      RtcEngineConfig config = new RtcEngineConfig();
-//      config.mAppId = getString(R.string.agora_app_id);
-//      config.mContext = context.getApplicationContext();
-//      config.mEventHandler = iRtcEngineEventHandler;
-//      config.mAreaCode = RtcEngineConfig.AreaCode.AREA_CODE_CN;
-//      RtcEngineConfig.LogConfig logConfig = new RtcEngineConfig.LogConfig();
-//      logConfig.level = Constants.LogLevel.getValue(Constants.LogLevel.LOG_LEVEL_FATAL);
-//      config.mLogConfig = logConfig;
-//      engine = RtcEngine.create(config);
-
       engine = RtcEngine.create(context.getApplicationContext(), getString(R.string.agora_app_id), iRtcEngineEventHandler);
+//      String dir = Environment.getExternalStorageDirectory().getAbsolutePath();
+//      String dir1 = context.getExternalFilesDir(null).getAbsolutePath();
+//      Log.i(TAG, "dir: " + dir + ", dir1: " + dir1);
     }
     catch (Exception e) {
       e.printStackTrace();
@@ -186,14 +179,12 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
   @Override
   public void onDestroy() {
     super.onDestroy();
-    if (bUseAgora) {
-      /**leaveChannel and Destroy the RtcEngine instance*/
-      if (engine != null) {
-        engine.leaveChannel();
-      }
-      mMainLooperHandler.post(RtcEngine::destroy);
-      engine = null;
+    /**leaveChannel and Destroy the RtcEngine instance*/
+    if (engine != null) {
+      engine.leaveChannel();
     }
+    mMainLooperHandler.post(RtcEngine::destroy);
+    engine = null;
     MetaBoltManager.instance().deInit();
   }
 
@@ -234,10 +225,18 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
       case R.id.btn_join: {
         if (isUserJoined) {
           isUserJoined = false;
-          engine.leaveChannel();
           playMusicState = PLAY_MUSIC_IDLE;
+          mIsRemoteVideoViewNeedShow = false;
+          mIsRemoteMetaViewNeedShow = false;
+          mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;
           engine.stopAudioMixing();
+          engine.leaveChannel();
           btn_join.setText(getString(R.string.join_channel));
+
+          MetaBoltManager.instance().destroyAvatarRole(UserConfig.kUid);
+          MetaBoltManager.instance().destroyAvatarView(0);
+          MetaBoltManager.instance().destroyAvatarRole(mRemoteUid);
+          MetaBoltManager.instance().destroyAvatarView(1);
         } else {
           joinChannel(UserConfig.kChannelId);
           initMetaboltRole();
@@ -334,7 +333,7 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
     @Override
     public void onError(int err) {
       Log.e(TAG, String.format("onError code %d message %s", err, RtcEngine.getErrorDescription(err)));
-      showAlert(String.format("onError code %d message %s", err, RtcEngine.getErrorDescription(err)));
+      //showAlert(String.format("onError code %d message %s", err, RtcEngine.getErrorDescription(err)));
     }
 
     /**Occurs when a user leaves the channel.
@@ -367,13 +366,12 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
           DataStreamConfig dataStreamConfig = new DataStreamConfig();
           dataStreamConfig.ordered = true;
           dataStreamConfig.syncWithAudio = true;
-          mAudioStreamId = engine.createDataStream(dataStreamConfig);
-          if (mAudioStreamId < 0) {
+          mLocalAudioStreamId = engine.createDataStream(dataStreamConfig);
+          if (mLocalAudioStreamId < 0) {
             Log.e(TAG, "createDataStream error");
           }
 
           mMetaBoltDataHandler.onJoinRoomSuccess(UserConfig.kChannelId, UserConfig.kUid, elapsed);
-          //initMetaboltRole();
         }
       });
     }
@@ -394,18 +392,22 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
       }
       mMainLooperHandler.post(() ->
       {
+        mRemoteUid = String.valueOf(uid);
         /**Display remote video stream*/
-        // Create render view by RtcEngine
-        SurfaceView surfaceView = RtcEngine.CreateRendererView(context);
-        surfaceView.setZOrderMediaOverlay(true);
-        if (fl_remote.getChildCount() > 0) {
-          fl_remote.removeAllViews();
+        if (addRemoteVideoView(context) < 0) {
+          showLongToast("添加" + uid + "视图失败");
+          mIsRemoteVideoViewNeedShow = true;
+        } else {
+          mIsRemoteVideoViewNeedShow = false;
         }
-        // Add to the remote container
-        fl_remote.addView(surfaceView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT));
-        // Setup remote video to render
-        engine.setupRemoteVideo(new VideoCanvas(surfaceView, RENDER_MODE_HIDDEN, uid));
+
+        if (mMetaServiceState == MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS) {
+          mIsRemoteMetaViewNeedShow = false;
+          // 创建远端meta role
+          initRemoteMetaView(context);
+        } else {
+          mIsRemoteMetaViewNeedShow = true;
+        }
       });
     }
 
@@ -430,6 +432,10 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
            Note: The video will stay at its last frame, to completely remove it you will need to
            remove the SurfaceView from its parent*/
           engine.setupRemoteVideo(new VideoCanvas(null, RENDER_MODE_HIDDEN, uid));
+          if (uid == Integer.valueOf(mRemoteUid)) {
+            MetaBoltManager.instance().destroyAvatarRole(mRemoteUid);
+            MetaBoltManager.instance().destroyAvatarView(1);
+          }
         }
       });
     }
@@ -458,7 +464,7 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
     // Create render view by RtcEngine
     SurfaceView surfaceView = RtcEngine.CreateRendererView(context);
     // Add to the local container
-    fl_local_preview.addView(surfaceView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    fl_local.addView(surfaceView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     // Setup local video to render your local camera preview
     engine.setupLocalVideo(new VideoCanvas(surfaceView, RENDER_MODE_HIDDEN, Integer.valueOf(UserConfig.kUid)));
 
@@ -473,8 +479,7 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
     engine.setClientRole(IRtcEngineEventHandler.ClientRole.CLIENT_ROLE_BROADCASTER);
     // Enable video module
     engine.enableVideo();
-    engine.startPreview();
-    engine.switchCamera();
+    //engine.switchCamera();
     // Setup video encoding configs
     engine.setVideoEncoderConfiguration(new VideoEncoderConfiguration(
         VD_640x360,
@@ -647,6 +652,11 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
 
     @Override
     public boolean onPlaybackFrameBeforeMixing(AudioFrame audioFrame, int uid) {
+      int length = audioFrame.samples.limit();
+      byte[] buffer = new byte[length];
+      audioFrame.samples.get(buffer);
+      mMetaBoltDataHandler.handleRecvMediaExtraInfo(String.valueOf(uid), buffer, length);
+      buffer = null;
       return false;
     }
 
@@ -703,7 +713,17 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
     }
   };
 
-
+  private int addRemoteVideoView(Context context) {
+    SurfaceView surfaceView = RtcEngine.CreateRendererView(context);
+    surfaceView.setZOrderMediaOverlay(true);
+    if (fl_remote.getChildCount() > 0) {
+      fl_remote.removeAllViews();
+    }
+    // Add to the remote container
+    fl_remote.addView(surfaceView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    // Setup remote video to render
+    return engine.setupRemoteVideo(new VideoCanvas(surfaceView, RENDER_MODE_HIDDEN, Integer.valueOf(mRemoteUid)));
+  }
 
 
   // meabolt
@@ -718,10 +738,15 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
 
       @Override
       public void onMetaBoltServiceStateChanged(int state) {
+        mMetaServiceState = state;
         if (state == MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS) {
           mMainLooperHandler.post(() -> {
-            MetaBoltManager.instance().createAvatarView(getContext(), 0);
-            MetaBoltManager.instance().createAvatarRole(getRoleModelPath(), UserConfig.kUid);
+            Context context = getContext();
+            if (context == null) {
+              return;
+            }
+            MetaBoltManager.instance().createAvatarView(context, 0);
+            MetaBoltManager.instance().createAvatarRole(getRoleModelPath(kRoleModelFemale), UserConfig.kUid);
             MetaBoltManager.instance().setRoleIndex(0, UserConfig.kUid);
             MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF);
             // MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HEAD);
@@ -732,7 +757,16 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
             //String beatDataPath = "/storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.bin";
             //MetaBoltManager.instance().startMusicBeat(getNewBeatDownPath());
             //String danceDataPath = "/storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat";
-            //MetaBoltManager.instance().startMusicDance(getNewDanceDownPath());
+            MetaBoltManager.instance().startMusicDance(getNewDanceDownPath());
+
+            if (mIsRemoteMetaViewNeedShow) {
+              mIsRemoteMetaViewNeedShow = false;
+              initRemoteMetaView(context);
+            }
+            if (mIsRemoteVideoViewNeedShow) {
+              mIsRemoteVideoViewNeedShow = false;
+              addRemoteVideoView(context);
+            }
             // showLongToast("metabolt service init success");
             Log.d(TAG, "metabolt service init success");
           });
@@ -745,14 +779,23 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
     config.appId = UserConfig.kAppId;
     config.accessToken = UserConfig.kToken;
     config.AIModelPath = UserConfig.kAIModelPath;
-    mMetaBoltDataHandler = MetaBoltManager.instance();
     MetaBoltManager.instance().init(config, true);
+  }
+
+  private void initRemoteMetaView(Context context) {
+    MetaBoltManager.instance().createAvatarView(context, 1);
+    MetaBoltManager.instance().createAvatarRole(getRoleModelPath(kRoleModelMale), mRemoteUid);
+    MetaBoltManager.instance().setRoleIndex(1, mRemoteUid);
+    MetaBoltManager.instance().setAvatarViewType(mRemoteUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF);
+    MetaBoltManager.instance().setAnimation(mRemoteUid, getRemoteAnimationDownPath());
   }
 
   private void initMetaService() {
     MetaBoltManager.createMetaBoltManager(getConfigJsonFile());
     MetaBoltManager.instance().registerSEICallback(this);
     MetaBoltManager.instance().setRootView(mRootView);
+
+    mMetaBoltDataHandler = MetaBoltManager.instance();
   }
 
   /**
@@ -923,39 +966,47 @@ public class MainFragment extends Fragment implements View.OnClickListener, Toke
   private String getNewBeatDownPath() {
     // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.bin
     //String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath();
-    //return targetDir + "/download/new_dance/Ku_puja_puja/Ku_puja_puja.bin";
-    return "/storage/emulated/0/Android/data/io.agora.api.example/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.bin";
+    String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
+    return targetDir + "/download/new_dance/Ku_puja_puja/Ku_puja_puja.bin";
+    //return "/storage/emulated/0/Android/data/io.agora.api.example/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.bin";
   }
 
   private String getNewDanceDownPath() {
     // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.dat
     // /storage/emulated/0/Android/data/io.agora.api.example/files/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat
-    //String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath();
-    //return targetDir + "/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat";
-    return "/storage/emulated/0/Android/data/io.agora.api.example/files/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat";
+    String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
+    return targetDir + "/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat";
+    //return "/storage/emulated/0/Android/data/io.agora.api.example/files/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat";
   }
 
   private String getAnimationDownPath() {
     // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/beat/singing/singing
-    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath();
+    String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
     return targetDir + "/download/beat/singing/singing";
     //return "/storage/emulated/0/Android/data/io.agora.api.example/files/download/beat/singing/singing";
   }
 
-  private String getRoleModelPath() {
+  private String getRemoteAnimationDownPath() {
+    // /storage/emulated/0/Android/data/io.agora.api.example/files/download/beat/jump/jump
+    String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
+    return targetDir + "/download/beat/singing/singing";
+    //return "/storage/emulated/0/Android/data/io.agora.api.example/files/download/beat/jump/jump";
+  }
+
+  private String getRoleModelPath(String roleName) {
     //String roleModelPath = DownloadUtil.get().getDownloadPath(Objects.requireNonNull(getContext())) + File.separator + "model_pkg_android" + File.separator + "female_role.json";
     String downPath = DownloadUtil.get().getDownloadPath(Objects.requireNonNull(getContext())) + File.separator;
     //String targetPath = "model_pkg_android" + File.separator + "male_role" + ".json";
-    String targetPath = "model_pkg_android" + File.separator + "female_role.json";
+    String targetPath = "model_pkg_android" + File.separator + roleName + ".json";
     return downPath + targetPath;
   }
 
   private String getMusicPath() {
     // /data/user/0/io.agora.api.example/files/download/new_dance/qinghuaci/qinghuaci.mp3
     // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/qinghuaci/qinghuaci.mp3
-    //String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath();
-    //return targetDir + "/download/new_dance/qinghuaci/qinghuaci.mp3";
-    return "/storage/emulated/0/Android/data/io.agora.api.example/files/download/new_dance/qinghuaci/qinghuaci.mp3";
+    String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
+    return targetDir + "/download/new_dance/qinghuaci/qinghuaci.mp3";
+    //return "/storage/emulated/0/Android/data/io.agora.api.example/files/download/new_dance/qinghuaci/qinghuaci.mp3";
   }
 
   private void downResource() {

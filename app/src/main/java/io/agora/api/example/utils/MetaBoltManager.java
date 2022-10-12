@@ -117,8 +117,8 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     }
 
     for (Map.Entry<Integer, MTBAvatarView> viewEntry : mAvatarViewMap.entrySet()) {
-      LinearLayout linearLayout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(viewEntry.getKey()));
-      linearLayout.removeView(viewEntry.getValue());
+      FrameLayout layout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(viewEntry.getKey()));
+      layout.removeView(viewEntry.getValue());
       mMetaBoltSrv.destroyAvatarView(viewEntry.getValue());
     }
 
@@ -256,15 +256,15 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 
     mAvatarViewMap.put(index, view);
 
-    LinearLayout frameLayout = mRootView.get().findViewById(R.id.fl_local_meta);
-    frameLayout.setOnClickListener(this);
-    view.setLayoutParams(frameLayout.getLayoutParams());
+    FrameLayout layout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(index));
+    layout.setOnClickListener(this);
+    view.setLayoutParams(layout.getLayoutParams());
     view.setBackgroundColor(getAvatarViewColorIdByIndex(index));
-    frameLayout.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+    layout.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
         ViewGroup.LayoutParams.MATCH_PARENT));
     view.setOnClickListener(this);
     view.bringToFront();
-    Log.i(TAG, "createAvatarView MTBAvatarView:" + view + ", frameLayout:" + frameLayout);
+    Log.i(TAG, "createAvatarView MTBAvatarView:" + view + ", layout:" + layout);
 
     return 0;
   }
@@ -273,8 +273,8 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     Log.i(TAG, "destroyAvatarView index: " + index);
     MTBAvatarView view = mAvatarViewMap.get(index);
     if (view != null) {
-      LinearLayout linearLayout = mRootView.get().findViewById(R.id.fl_local_meta);
-      linearLayout.removeView(view);
+      FrameLayout layout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(index));
+      layout.removeView(view);
       Log.i(TAG, "destroyAvatarView remove view: " + index);
       mAvatarViewMap.remove(index);
       mMetaBoltSrv.destroyAvatarView(view);
@@ -589,9 +589,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
   private int mRevMediaExtraInfoCnt = 0;
   @Override
   public void handleRecvMediaExtraInfo(String uid, byte[] data, int dataLen) {
-    if (mRevMediaExtraInfoCnt % 100 == 0) {
-      Log.i(TAG, "handleRecvMediaExtraInfo, uid: " + uid + ", base64 data: " + Base64.encodeToString(data, Base64.NO_WRAP));
-    }
+    //if (mRevMediaExtraInfoCnt % 100 == 0) {
+      Log.i(TAG, "handleRecvMediaExtraInfo uid:" + uid + ", base64 dataLen:" + dataLen);
+    //}
     mRevMediaExtraInfoCnt++;
     if (mMetaBoltSrv != null) {
       byte[] startData = ByteUtil.subByte(data, 0, kSEIStartLen);
@@ -690,7 +690,12 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 //      return R.id.avatar_view_container_5;
 //    }
 //    return R.id.avatar_view_container_6;
-    return R.id.fl_local_meta;
+    switch (index) {
+      case 1:
+        return R.id.fl_remote_meta;
+      default:
+        return R.id.fl_local_meta;
+    }
 //    return R.id.fl_local;
   }
 
@@ -771,15 +776,15 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
       MTBAvatarView view = entry.getValue();
       Integer viewIndex = entry.getKey();
       int containerId = getAvatarContainerViewIdByIndex(viewIndex);
-      LinearLayout windowLayout = mRootView.get().findViewById(containerId);
+      FrameLayout layout = mRootView.get().findViewById(containerId);
 
       if (hidden) {
-        windowLayout.removeView(view);
-        windowLayout.setVisibility(View.INVISIBLE);
+        layout.removeView(view);
+        layout.setVisibility(View.INVISIBLE);
         view.setVisibility(View.INVISIBLE);
       } else {
-        windowLayout.addView(view);
-        windowLayout.setVisibility(View.VISIBLE);
+        layout.addView(view);
+        layout.setVisibility(View.VISIBLE);
         view.setVisibility(View.VISIBLE);
         view.refresh();
       }
