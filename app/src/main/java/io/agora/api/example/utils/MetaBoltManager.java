@@ -11,7 +11,6 @@ import android.util.Log;
 import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
@@ -37,8 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 import io.agora.api.example.R;
-import io.agora.api.example.utils.IMetaBoltDataHandler;
-import io.agora.api.example.utils.IMetaFragmentHandler;
+import io.agora.rtc.Constants;
 
 
 public class MetaBoltManager extends MTBServiceEventHandler implements View.OnClickListener, IMTBLogCallback, IMetaBoltDataHandler, MTBTrackEngine.TrackFaceEmotionHandler, MTBTrackEngine.TrackMusicBeatHandler, MTBTrackEngine.TrackMusicDanceHandler, Handler.Callback {
@@ -258,7 +256,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     mAvatarViewMap.put(index, view);
 
     FrameLayout layout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(index));
-    layout.setBackgroundColor(Color.GRAY);
+    //layout.setBackgroundColor(Color.GRAY);
     view.setLayoutParams(layout.getLayoutParams());
     layout.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     view.setOnClickListener(this);
@@ -272,7 +270,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     MTBAvatarView view = mAvatarViewMap.get(index);
     if (view != null) {
       FrameLayout layout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(index));
-      layout.setBackgroundColor(Color.WHITE);
+      //layout.setBackgroundColor(Color.WHITE);
       layout.removeView(view);
       Log.i(TAG, "destroyAvatarView remove view: " + index);
       mAvatarViewMap.remove(index);
@@ -399,7 +397,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
   public void onLocalAudioStatusChanged(int status, int errorReason) {
 //    if (status == ThunderRtcConstant.LocalAudioStreamStatus.THUNDER_LOCAL_AUDIO_STREAM_STATUS_STOPPED ||
 //        status == ThunderRtcConstant.LocalAudioStreamStatus.THUNDER_LOCAL_AUDIO_STREAM_STATUS_FAILED) {
-    if (io.agora.rtc.Constants.LOCAL_AUDIO_STREAM_STATE_STOPPED == status || io.agora.rtc.Constants.LOCAL_AUDIO_STREAM_STATE_FAILED == status) {
+    if (Constants.LOCAL_AUDIO_STREAM_STATE_STOPPED == status || Constants.LOCAL_AUDIO_STREAM_STATE_FAILED == status) {
       if (isInit()) {
         MTBAvatarRole myRole = mAvatarRoleMap.get(UserConfig.kUid);
         if (myRole != null && mIsOpenAudioEmotion) {
@@ -592,8 +590,8 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
    *  type: 2  dance
    *  type: 3  beat
    */
-  private final String kLipsyncFlag = "lipsync";
-  private final int kSEIStartLen = kLipsyncFlag.getBytes().length;
+  private final static String kLipsyncFlag = "lipsync";
+  private final static int kSEIStartLen = kLipsyncFlag.getBytes().length;
 
   private final int kBlendShapeType = 1;
   private final int kDanceType      = 2;
@@ -614,7 +612,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
   private final Map<Integer, Integer> mSendMediaSEIMap = new ConcurrentHashMap<>();
   public void handleSendMediaExtraInfo() {
     if ((mIsOpenAudioEmotion || mIsOpenDance || mIsOpenBeat) &&
-        mAudioPublishStatus == io.agora.rtc.Constants.PUB_STATE_PUBLISHED) {
+        mAudioPublishStatus == Constants.PUB_STATE_PUBLISHED) {
 
       if (mEmotionDataBufferList.isEmpty() && mDanceDataBufferList.isEmpty() && mBeatDataBufferList.isEmpty()) {
         return;

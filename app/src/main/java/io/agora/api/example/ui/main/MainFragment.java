@@ -33,8 +33,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -63,17 +61,6 @@ import io.agora.rtc.models.DataStreamConfig;
 import io.agora.rtc.video.VideoCanvas;
 import io.agora.rtc.video.VideoEncoderConfiguration;
 
-import static io.agora.rtc.Constants.ERR_OK;
-import static io.agora.rtc.Constants.LOCAL_AUDIO_STREAM_STATE_STOPPED;
-import static io.agora.rtc.Constants.PUB_STATE_IDLE;
-import static io.agora.rtc.Constants.PUB_STATE_NO_PUBLISHED;
-import static io.agora.rtc.Constants.PUB_STATE_PUBLISHED;
-import static io.agora.rtc.Constants.PUB_STATE_PUBLISHING;
-import static io.agora.rtc.Constants.RAW_AUDIO_FRAME_OP_MODE_READ_ONLY;
-import static io.agora.rtc.video.VideoCanvas.RENDER_MODE_HIDDEN;
-import static io.agora.rtc.video.VideoEncoderConfiguration.STANDARD_BITRATE;
-import static io.agora.rtc.video.VideoEncoderConfiguration.VD_640x360;
-
 public class MainFragment extends Fragment implements View.OnClickListener,
     TokenUtils.OnTokenListener,
     DownloadUtil.OnDownloadListener,
@@ -89,7 +76,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private int mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;
   private boolean mIsRemoteVideoViewNeedShow = false;
   private boolean mIsRemoteMetaViewNeedShow = false;
-  private String mRemoteUid;
+  private String mRemoteUid = null;
   private FrameLayout fl_local_meta, fl_local, fl_remote_meta, fl_remote;
   private Button btn_join, btn_req_token, btn_play_music;
   private EditText et_uid;
@@ -267,11 +254,11 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           playMusicState = PLAY_MUSIC_PLAY;
           String music = getMusicPath();
           int ret = engine.startAudioMixing(music, false, false, 1, 0);
-          if (ERR_OK != ret) {
+          if (Constants.ERR_OK != ret) {
             Log.e(TAG, "startAudioMixing " + music + " failed " + engine.getErrorDescription(ret));
           }
           ret = engine.getAudioFileInfo(music);
-          if (ERR_OK != ret) {
+          if (Constants.ERR_OK != ret) {
             Log.e(TAG, "getAudioFileInfo " + music + " failed " + engine.getErrorDescription(ret));
           }
           String danceMusic = getNewDanceDownPath();
@@ -355,6 +342,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       super.onLeaveChannel(stats);
       Log.i(TAG, String.format("local user %d leaveChannel!", UserConfig.kUid));
       showLongToast(String.format("local user %d leaveChannel!", UserConfig.kUid));
+      if (null != mMetaBoltDataHandler) {
+        mMetaBoltDataHandler.onLeaveRoom();
+      }
     }
 
     /**Occurs when the local user joins a specified channel.
@@ -378,11 +368,13 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           dataStreamConfig.ordered = true;
           dataStreamConfig.syncWithAudio = true;
           mLocalAudioStreamId = engine.createDataStream(dataStreamConfig);
-          if (mLocalAudioStreamId < ERR_OK) {
+          if (mLocalAudioStreamId < Constants.ERR_OK) {
             Log.e(TAG, "createDataStream error:" + RtcEngine.getErrorDescription(mLocalAudioStreamId));
           }
 
-          mMetaBoltDataHandler.onJoinRoomSuccess(UserConfig.kChannelId, UserConfig.kUid, elapsed);
+          if (null != mMetaBoltDataHandler) {
+            mMetaBoltDataHandler.onJoinRoomSuccess(UserConfig.kChannelId, UserConfig.kUid, elapsed);
+          }
         }
       });
     }
@@ -442,9 +434,13 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           /**Clear render view
            Note: The video will stay at its last frame, to completely remove it you will need to
            remove the SurfaceView from its parent*/
-          engine.setupRemoteVideo(new VideoCanvas(null, RENDER_MODE_HIDDEN, uid));
+          if (null != mMetaBoltDataHandler) {
+            mMetaBoltDataHandler.onUserOffline(String.valueOf(uid), 0);
+          }
+          engine.setupRemoteVideo(new VideoCanvas(null, Constants.RENDER_MODE_HIDDEN, uid));
           MetaBoltManager.instance().destroyAvatarRole(mRemoteUid);
           MetaBoltManager.instance().destroyAvatarView(1);
+          mRemoteUid = null;
         }
       });
     }
@@ -468,6 +464,17 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       //LOCAL_AUDIO_STREAM_STATE_STOPPED;
       if (null != mMetaBoltDataHandler) {
         mMetaBoltDataHandler.onLocalAudioStatusChanged(state, error);
+      }
+    }
+
+    @Override
+    public void onRemoteAudioStateChanged(int uid, int state, int reason, int elapsed) {
+      if (null != mMetaBoltDataHandler) {
+        if (Constants.REMOTE_AUDIO_STATE_STOPPED == state) {
+          mMetaBoltDataHandler.onRemoteAudioStopped(String.valueOf(uid), true);
+        } else if (Constants.REMOTE_AUDIO_STATE_STARTING == state) {
+          mMetaBoltDataHandler.onRemoteAudioStopped(String.valueOf(uid), false);
+        }
       }
     }
 
@@ -516,7 +523,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     // Add to the local container
     fl_local.addView(surfaceView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     // Setup local video to render your local camera preview
-    engine.setupLocalVideo(new VideoCanvas(surfaceView, RENDER_MODE_HIDDEN, Integer.valueOf(UserConfig.kUid)));
+    engine.setupLocalVideo(new VideoCanvas(surfaceView, Constants.RENDER_MODE_HIDDEN, Integer.valueOf(UserConfig.kUid)));
 
     /** Sets the channel profile of the Agora RtcEngine.
      CHANNEL_PROFILE_COMMUNICATION(0): (Default) The Communication profile.
@@ -533,9 +540,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     //engine.switchCamera();
     // Setup video encoding configs
     engine.setVideoEncoderConfiguration(new VideoEncoderConfiguration(
-        VD_640x360,
+        VideoEncoderConfiguration.VD_640x360,
         VideoEncoderConfiguration.FRAME_RATE.FRAME_RATE_FPS_15,
-        STANDARD_BITRATE,
+        VideoEncoderConfiguration.STANDARD_BITRATE,
         VideoEncoderConfiguration.ORIENTATION_MODE.ORIENTATION_MODE_ADAPTIVE
     ));
     /**Set up to play remote sound with receiver*/
@@ -552,7 +559,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
      * samplesPerCall	Sets the number of samples returned in the onRecordAudioFrame callback. samplesPerCall is usually set as 1024 for RTMP streaming.
      * The SDK triggers the onRecordAudioFrame callback according to the sample interval. Ensure that the sample interval ≥ 0.01 (s). And, Sample interval (sec) = samplePerCall/(sampleRate × channel).
      */
-    engine.setRecordingAudioFrameParameters(4000, 1, RAW_AUDIO_FRAME_OP_MODE_READ_ONLY, 1024);
+    engine.setRecordingAudioFrameParameters(4000, 1, Constants.RAW_AUDIO_FRAME_OP_MODE_READ_ONLY, 1024);
 
     /**
      * Sets the audio playback format for the onPlaybackAudioFrame callback.
@@ -564,7 +571,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
      * samplesPerCall	Sets the number of samples returned in the onRecordAudioFrame callback. samplesPerCall is usually set as 1024 for RTMP streaming.
      * The SDK triggers the onRecordAudioFrame callback according to the sample interval. Ensure that the sample interval ≥ 0.01 (s). And, Sample interval (sec) = samplePerCall/(sampleRate × channel).
      */
-    engine.setPlaybackAudioFrameParameters(4000, 1, RAW_AUDIO_FRAME_OP_MODE_READ_ONLY, 1024);
+    engine.setPlaybackAudioFrameParameters(4000, 1, Constants.RAW_AUDIO_FRAME_OP_MODE_READ_ONLY, 1024);
 
     /**
      * Sets the mixed audio format for the onMixedAudioFrame callback.
@@ -672,7 +679,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     return output;
   }
 
-  int mDataStreamCount = 0;
   private final IAudioFrameObserver audioFrameObserver = new IAudioFrameObserver() {
     @Override
     public boolean onRecordFrame(AudioFrame audioFrame) {
@@ -681,7 +687,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       byte[] buffer = new byte[length];
       audioFrame.samples.get(buffer);
       mMetaBoltDataHandler.handlerCaptureAudioData(buffer,
-          length/*audioFrame.numOfSamples * audioFrame.bytesPerSample*/,
+          length,
           audioFrame.samplesPerSec,
           audioFrame.channels,
           true);
@@ -689,29 +695,13 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       return true;
     }
 
-    private final String kLipsyncFlag = "lipsync";
-    private final int kSEIStartLen = kLipsyncFlag.getBytes().length;
     @Override
     public boolean onPlaybackFrame(AudioFrame audioFrame) {
-      //Log.i(TAG, "onPlaybackFrame " + audioFrame.toString());
-      if (null == mRemoteUid) {
-        return false;
-      }
-      int length = audioFrame.samples.limit();
-//      byte[] buffer = new byte[length + kSEIStartLen];
-//      ByteBuffer syncAudio = ByteBuffer.allocate(kSEIStartLen + length);
-//      syncAudio.wrap(kLipsyncFlag.getBytes(StandardCharsets.UTF_8));
-//      syncAudio.put(audioFrame.samples.array());
-      String seiAudio = kLipsyncFlag + StandardCharsets.UTF_8.decode(audioFrame.samples).toString();
-//      syncAudio.get(buffer);
-      mMetaBoltDataHandler.handleRecvMediaExtraInfo(mRemoteUid, seiAudio.getBytes(), seiAudio.length());
-//      buffer = null;
       return false;
     }
 
     @Override
     public boolean onPlaybackFrameBeforeMixing(AudioFrame audioFrame, int uid) {
-      Log.i(TAG, "onPlaybackFrameBeforeMixing " + audioFrame.toString() + ", uid:" + uid);
       return false;
     }
 
@@ -727,13 +717,12 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
     @Override
     public boolean onPlaybackFrameBeforeMixingEx(AudioFrame audioFrame, int uid, String channelId) {
-      Log.i(TAG, "onPlaybackFrameBeforeMixingEx " + audioFrame.toString() + ", uid:" + uid + ", channelId:" + channelId);
       return false;
     }
 
     @Override
     public int getObservedAudioFramePosition() {
-      return IAudioFrameObserver.POSITION_PLAYBACK | IAudioFrameObserver.POSITION_RECORD | IAudioFrameObserver.POSITION_MIXED;
+      return IAudioFrameObserver.POSITION_RECORD | IAudioFrameObserver.POSITION_MIXED;
     }
 
     @Override
@@ -779,7 +768,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     // Add to the remote container
     fl_remote.addView(surfaceView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     // Setup remote video to render
-    return engine.setupRemoteVideo(new VideoCanvas(surfaceView, RENDER_MODE_HIDDEN, Integer.valueOf(mRemoteUid)));
+    return engine.setupRemoteVideo(new VideoCanvas(surfaceView, Constants.RENDER_MODE_HIDDEN, Integer.valueOf(mRemoteUid)));
   }
 
 
@@ -789,18 +778,14 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     MetaBoltManager.instance().registerMgrCallback(new MetaBoltMgrCallback() {
       @Override
       public void onJoinRoomSuccess(String channel, String uid, int elapsed) {
-//        Log.i(TAG, "thunderbolt " + uid + ", join room " + channel + " success, elapsed " + elapsed);
-//        mMetaBoltDataHandler.onJoinRoomSuccess(UserConfig.kChannelId, UserConfig.kUid, elapsed);
       }
 
       @Override
       public void onUserOffline(String uid, int reason) {
-
       }
 
       @Override
       public void onRemoteAudioStopped(String uid, boolean stop) {
-
       }
 
       @Override
@@ -818,9 +803,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
             MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF);
             // MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HEAD);
 
-            MetaBoltManager.instance().startFaceEmotionByAudio();
-            MetaBoltManager.instance().startFaceEmotionByCamera();
             MetaBoltManager.instance().setAnimation(UserConfig.kUid, getAnimationDownPath());
+            MetaBoltManager.instance().startFaceEmotionByAudio();
+            //MetaBoltManager.instance().startFaceEmotionByCamera();
             //String beatDataPath = "/storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.bin";
             //MetaBoltManager.instance().startMusicBeat(getNewBeatDownPath());
             //String danceDataPath = "/storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat";
@@ -1168,7 +1153,12 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
   @Override
   public int onAudioSEIData(ByteBuffer byteBuffer) {
-    return 0;
+    byteBuffer.rewind();
+    byte[] buffer = new byte[byteBuffer.limit()];
+    byteBuffer.get(buffer);
+    int ret = engine.sendStreamMessage(mLocalAudioStreamId, buffer);
+    buffer = null;
+    return ret;
   }
 
   @Override
