@@ -32,6 +32,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -60,6 +63,12 @@ import io.agora.rtc.models.DataStreamConfig;
 import io.agora.rtc.video.VideoCanvas;
 import io.agora.rtc.video.VideoEncoderConfiguration;
 
+import static io.agora.rtc.Constants.ERR_OK;
+import static io.agora.rtc.Constants.LOCAL_AUDIO_STREAM_STATE_STOPPED;
+import static io.agora.rtc.Constants.PUB_STATE_IDLE;
+import static io.agora.rtc.Constants.PUB_STATE_NO_PUBLISHED;
+import static io.agora.rtc.Constants.PUB_STATE_PUBLISHED;
+import static io.agora.rtc.Constants.PUB_STATE_PUBLISHING;
 import static io.agora.rtc.Constants.RAW_AUDIO_FRAME_OP_MODE_READ_ONLY;
 import static io.agora.rtc.video.VideoCanvas.RENDER_MODE_HIDDEN;
 import static io.agora.rtc.video.VideoEncoderConfiguration.STANDARD_BITRATE;
@@ -231,12 +240,15 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;
           engine.stopAudioMixing();
           engine.leaveChannel();
+          engine.stopPreview();
           btn_join.setText(getString(R.string.join_channel));
 
           MetaBoltManager.instance().destroyAvatarRole(UserConfig.kUid);
           MetaBoltManager.instance().destroyAvatarView(0);
-          MetaBoltManager.instance().destroyAvatarRole(mRemoteUid);
-          MetaBoltManager.instance().destroyAvatarView(1);
+          if (null != mRemoteUid) {
+            MetaBoltManager.instance().destroyAvatarRole(mRemoteUid);
+            MetaBoltManager.instance().destroyAvatarView(1);
+          }
         } else {
           joinChannel(UserConfig.kChannelId);
           initMetaboltRole();
@@ -255,12 +267,12 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           playMusicState = PLAY_MUSIC_PLAY;
           String music = getMusicPath();
           int ret = engine.startAudioMixing(music, false, false, 1, 0);
-          if (ret < 0) {
-            Log.e(TAG, "startAudioMixing " + music + " failed");
+          if (ERR_OK != ret) {
+            Log.e(TAG, "startAudioMixing " + music + " failed " + engine.getErrorDescription(ret));
           }
           ret = engine.getAudioFileInfo(music);
-          if (ret <= 0) {
-            Log.e(TAG, "getAudioFileInfo " + music + " failed");
+          if (ERR_OK != ret) {
+            Log.e(TAG, "getAudioFileInfo " + music + " failed " + engine.getErrorDescription(ret));
           }
           String danceMusic = getNewDanceDownPath();
           MetaBoltManager.instance().startMusicDance(danceMusic);
@@ -301,7 +313,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     ).onGranted(permissions ->
     {
       // Permissions Granted
-      //joinChannel(channelId);
     }).start();
   }
 
@@ -325,7 +336,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
      * Warning code: https://docs.agora.io/en/Voice/API%20Reference/java/classio_1_1agora_1_1rtc_1_1_i_rtc_engine_event_handler_1_1_warn_code.html*/
     @Override
     public void onWarning(int warn) {
-      Log.w(TAG, String.format("onWarning code %d message %s", warn, RtcEngine.getErrorDescription(warn)));
+      //Log.w(TAG, String.format("onWarning code %d message %s", warn, RtcEngine.getErrorDescription(warn)));
     }
 
     /**Reports an error during SDK runtime.
@@ -367,8 +378,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           dataStreamConfig.ordered = true;
           dataStreamConfig.syncWithAudio = true;
           mLocalAudioStreamId = engine.createDataStream(dataStreamConfig);
-          if (mLocalAudioStreamId < 0) {
-            Log.e(TAG, "createDataStream error");
+          if (mLocalAudioStreamId < ERR_OK) {
+            Log.e(TAG, "createDataStream error:" + RtcEngine.getErrorDescription(mLocalAudioStreamId));
           }
 
           mMetaBoltDataHandler.onJoinRoomSuccess(UserConfig.kChannelId, UserConfig.kUid, elapsed);
@@ -432,10 +443,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
            Note: The video will stay at its last frame, to completely remove it you will need to
            remove the SurfaceView from its parent*/
           engine.setupRemoteVideo(new VideoCanvas(null, RENDER_MODE_HIDDEN, uid));
-          if (uid == Integer.valueOf(mRemoteUid)) {
-            MetaBoltManager.instance().destroyAvatarRole(mRemoteUid);
-            MetaBoltManager.instance().destroyAvatarView(1);
-          }
+          MetaBoltManager.instance().destroyAvatarRole(mRemoteUid);
+          MetaBoltManager.instance().destroyAvatarView(1);
         }
       });
     }
@@ -444,12 +453,52 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     public void onStreamMessage(int uid, int streamId, byte[] data) {
       Log.i(TAG, "onStreamMessage uid:" + uid + ", streamId:" + streamId + ", data:" + data);
       // 回调音频sei数据
-      mMetaBoltDataHandler.handleRecvMediaExtraInfo(String.valueOf(uid), data, data.length);
+      if (null != mMetaBoltDataHandler) {
+        mMetaBoltDataHandler.handleRecvMediaExtraInfo(String.valueOf(uid), data, data.length);
+      }
     }
 
     @Override
     public void onStreamMessageError(int uid, int streamId, int error, int missed, int cached) {
       Log.e(TAG, "onStreamMessageError uid:" + uid + ", streamId:" + streamId + ", err:" + error + ", missed:" + missed + ", cached:" + cached);
+    }
+
+    @Override
+    public void onLocalAudioStateChanged(int state, int error) {
+      //LOCAL_AUDIO_STREAM_STATE_STOPPED;
+      if (null != mMetaBoltDataHandler) {
+        mMetaBoltDataHandler.onLocalAudioStatusChanged(state, error);
+      }
+    }
+
+    @Override
+    public void onAudioPublishStateChanged(String channel, int oldState, int newState, int elapseSinceLastState) {
+      if (null != mMetaBoltDataHandler) {
+        mMetaBoltDataHandler.onLocalAudioPublishStatus(newState);
+//        switch (newState) {
+//          case PUB_STATE_IDLE:
+//          case PUB_STATE_NO_PUBLISHED:
+//          case PUB_STATE_PUBLISHING: {
+//            mMetaBoltDataHandler.onLocalAudioPublishStatus(THUNDER_LOCAL_AUDIO_PUBLISH_STATUS_STOP);
+//            break;
+//          }
+//          case PUB_STATE_PUBLISHED: {
+//            mMetaBoltDataHandler.onLocalAudioPublishStatus(THUNDER_LOCAL_AUDIO_PUBLISH_STATUS_START);
+//            break;
+//          }
+//          default: {
+//            break;
+//          }
+//        }
+      }
+    }
+
+    @Override
+    public void onVideoPublishStateChanged(String channel, int oldState, int newState, int elapseSinceLastState) {
+    }
+
+    @Override
+    public void onLocalVideoStateChanged(int localVideoState, int error) {
     }
   };
 
@@ -462,6 +511,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     }
 
     // Create render view by RtcEngine
+    //SurfaceView surfaceView = new SurfaceView(context);
     SurfaceView surfaceView = RtcEngine.CreateRendererView(context);
     // Add to the local container
     fl_local.addView(surfaceView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -479,6 +529,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     engine.setClientRole(IRtcEngineEventHandler.ClientRole.CLIENT_ROLE_BROADCASTER);
     // Enable video module
     engine.enableVideo();
+    engine.startPreview();
     //engine.switchCamera();
     // Setup video encoding configs
     engine.setVideoEncoderConfiguration(new VideoEncoderConfiguration(
@@ -621,11 +672,12 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     return output;
   }
 
+  int mDataStreamCount = 0;
   private final IAudioFrameObserver audioFrameObserver = new IAudioFrameObserver() {
     @Override
     public boolean onRecordFrame(AudioFrame audioFrame) {
       int length = audioFrame.samples.limit();
-      //Log.i(TAG, "onRecordAudioFrame " + audioFrame.toString() + ", length:" + length);
+      //Log.i(TAG, "onRecordAudioFrame " + audioFrame.toString());
       byte[] buffer = new byte[length];
       audioFrame.samples.get(buffer);
       mMetaBoltDataHandler.handlerCaptureAudioData(buffer,
@@ -633,30 +685,33 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           audioFrame.samplesPerSec,
           audioFrame.channels,
           true);
-//       if(audioMixing){
-//          ByteBuffer byteBuffer = audioFrame.samples;
-//          byte[] buffer = readBuffer();
-//          byte[] origin = new byte[byteBuffer.remaining()];
-//          byteBuffer.get(origin);
-//          byteBuffer.flip();
-//          byteBuffer.put(audioAggregate(origin, buffer), 0, byteBuffer.remaining());
-//      }
       buffer = null;
       return true;
     }
 
+    private final String kLipsyncFlag = "lipsync";
+    private final int kSEIStartLen = kLipsyncFlag.getBytes().length;
     @Override
     public boolean onPlaybackFrame(AudioFrame audioFrame) {
+      //Log.i(TAG, "onPlaybackFrame " + audioFrame.toString());
+      if (null == mRemoteUid) {
+        return false;
+      }
+      int length = audioFrame.samples.limit();
+//      byte[] buffer = new byte[length + kSEIStartLen];
+//      ByteBuffer syncAudio = ByteBuffer.allocate(kSEIStartLen + length);
+//      syncAudio.wrap(kLipsyncFlag.getBytes(StandardCharsets.UTF_8));
+//      syncAudio.put(audioFrame.samples.array());
+      String seiAudio = kLipsyncFlag + StandardCharsets.UTF_8.decode(audioFrame.samples).toString();
+//      syncAudio.get(buffer);
+      mMetaBoltDataHandler.handleRecvMediaExtraInfo(mRemoteUid, seiAudio.getBytes(), seiAudio.length());
+//      buffer = null;
       return false;
     }
 
     @Override
     public boolean onPlaybackFrameBeforeMixing(AudioFrame audioFrame, int uid) {
-      int length = audioFrame.samples.limit();
-      byte[] buffer = new byte[length];
-      audioFrame.samples.get(buffer);
-      mMetaBoltDataHandler.handleRecvMediaExtraInfo(String.valueOf(uid), buffer, length);
-      buffer = null;
+      Log.i(TAG, "onPlaybackFrameBeforeMixing " + audioFrame.toString() + ", uid:" + uid);
       return false;
     }
 
@@ -672,12 +727,13 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
     @Override
     public boolean onPlaybackFrameBeforeMixingEx(AudioFrame audioFrame, int uid, String channelId) {
+      Log.i(TAG, "onPlaybackFrameBeforeMixingEx " + audioFrame.toString() + ", uid:" + uid + ", channelId:" + channelId);
       return false;
     }
 
     @Override
     public int getObservedAudioFramePosition() {
-      return IAudioFrameObserver.POSITION_RECORD | IAudioFrameObserver.POSITION_MIXED;
+      return IAudioFrameObserver.POSITION_PLAYBACK | IAudioFrameObserver.POSITION_RECORD | IAudioFrameObserver.POSITION_MIXED;
     }
 
     @Override
@@ -714,6 +770,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   };
 
   private int addRemoteVideoView(Context context) {
+    //SurfaceView surfaceView = new SurfaceView(context);
     SurfaceView surfaceView = RtcEngine.CreateRendererView(context);
     surfaceView.setZOrderMediaOverlay(true);
     if (fl_remote.getChildCount() > 0) {
@@ -737,6 +794,16 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       }
 
       @Override
+      public void onUserOffline(String uid, int reason) {
+
+      }
+
+      @Override
+      public void onRemoteAudioStopped(String uid, boolean stop) {
+
+      }
+
+      @Override
       public void onMetaBoltServiceStateChanged(int state) {
         mMetaServiceState = state;
         if (state == MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS) {
@@ -757,7 +824,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
             //String beatDataPath = "/storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.bin";
             //MetaBoltManager.instance().startMusicBeat(getNewBeatDownPath());
             //String danceDataPath = "/storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat";
-            MetaBoltManager.instance().startMusicDance(getNewDanceDownPath());
+            //MetaBoltManager.instance().startMusicDance(getNewDanceDownPath());
 
             if (mIsRemoteMetaViewNeedShow) {
               mIsRemoteMetaViewNeedShow = false;
@@ -1100,7 +1167,17 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   }
 
   @Override
-  public void onAudioSEIData(byte[] data) {
+  public int onAudioSEIData(ByteBuffer byteBuffer) {
+    return 0;
+  }
 
+  @Override
+  public long getMusicPlayCurrentProgress() {
+    return 0;
+  }
+
+  @Override
+  public long getMusicPlayTotalProgress() {
+    return 0;
   }
 }

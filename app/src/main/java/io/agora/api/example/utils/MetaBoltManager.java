@@ -1,15 +1,17 @@
 package io.agora.api.example.utils;
 
-
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Color;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Message;
 import android.util.Base64;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
@@ -30,17 +32,21 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 import io.agora.api.example.R;
+import io.agora.api.example.utils.IMetaBoltDataHandler;
+import io.agora.api.example.utils.IMetaFragmentHandler;
 
 
-public class MetaBoltManager extends MTBServiceEventHandler implements View.OnClickListener, IMTBLogCallback, IMetaBoltDataHandler, MTBTrackEngine.TrackFaceEmotionHandler, MTBTrackEngine.TrackMusicBeatHandler, MTBTrackEngine.TrackMusicDanceHandler {
+public class MetaBoltManager extends MTBServiceEventHandler implements View.OnClickListener, IMTBLogCallback, IMetaBoltDataHandler, MTBTrackEngine.TrackFaceEmotionHandler, MTBTrackEngine.TrackMusicBeatHandler, MTBTrackEngine.TrackMusicDanceHandler, Handler.Callback {
   private static final String TAG = "MetaBoltManager";
-  public static final int kMaxViewNum = 7;
+  public static final int kMaxViewNum = 6;
 
-  private Handler mHandler = new Handler(Looper.getMainLooper());
-  private final int mHandlerDelayMs = 41;
+  private Handler mHandler = null;
+  private final int kHandlerDelayMs = 40;
 
   @SuppressLint("StaticFieldLeak")
   private static MetaBoltManager mInstance = null;
@@ -101,13 +107,14 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     mMetaBoltSrv.setLogCallback(this);
     int res = mMetaBoltSrv.initWithConfig(config);
     if (res != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-      Log.e(TAG, "metabolt init failed config:" + config.toString());
+      Log.e(TAG, "init config failed, model path: " + mAIModelPath);
       mMetaBoltSrv.removeMetaBoltObserver(this);
       mMetaBoltSrv.setLogCallback(null);
       mMetaBoltSrv = null;
       return res;
     }
-    Log.i(TAG, "metabolt init config:" + config.toString() + ", isAddHandler:" + isAddHandler);
+    Log.i(TAG, "metaBolt sdk version: " + mMetaBoltSrv.getMetaBoltVersion() + ", model path: " + mAIModelPath);
+    startHandler();
     return res;
   }
 
@@ -115,10 +122,11 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     if (!isInit()) {
       return -1;
     }
-
+    stopHandler();
     for (Map.Entry<Integer, MTBAvatarView> viewEntry : mAvatarViewMap.entrySet()) {
-      FrameLayout layout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(viewEntry.getKey()));
-      layout.removeView(viewEntry.getValue());
+      LinearLayout linearLayout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(viewEntry.getKey()));
+      linearLayout.setBackgroundColor(Color.WHITE);
+      linearLayout.removeView(viewEntry.getValue());
       mMetaBoltSrv.destroyAvatarView(viewEntry.getValue());
     }
 
@@ -129,11 +137,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     mAvatarRoleMap.clear();
     mAvatarViewMap.clear();
 
-    synchronized (mRevInfoLock) {
-      mEmotionData = null;
-      mBeatData = null;
-      mDanceData = null;
-    }
+    mEmotionDataBufferList.clear();
+    mBeatDataBufferList.clear();
+    mDanceDataBufferList.clear();
 
     int res = mMetaBoltSrv.unInit();
     if (res != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
@@ -164,79 +170,74 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     return mMetaBoltSrv.getMetaBoltServiceState();
   }
 
+  private boolean mIsOpenAudioEmotion = false;
   public int startFaceEmotionByAudio() {
     Log.i(TAG, "startFaceEmotionByAudio");
-    int ret = mMetaBoltSrv.getTrackEngine().startTrackFaceEmotion(MTBTrackEngine.MTTrackMode.MT_TRACK_MODE_AUDIO, this::onRecvTrackEmotionInfo);
-    if (ret != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-      return ret;
-    }
-    startHandler();
-    return ret;
+    mIsOpenAudioEmotion = true;
+    return mMetaBoltSrv.getTrackEngine().startTrackFaceEmotion(MTBTrackEngine.MTTrackMode.MT_TRACK_MODE_AUDIO, this::onRecvTrackEmotionInfo);
   }
 
   public int startFaceEmotionByCamera() {
     Log.i(TAG, "startFaceEmotionByCamera");
-    int ret = mMetaBoltSrv.getTrackEngine().startTrackFaceEmotion(MTBTrackEngine.MTTrackMode.MT_TRACK_MODE_CAMERA, this::onRecvTrackEmotionInfo);
-    if (ret != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-      return ret;
-    }
-//        startHandler();
-    return ret;
+    return mMetaBoltSrv.getTrackEngine().startTrackFaceEmotion(MTBTrackEngine.MTTrackMode.MT_TRACK_MODE_CAMERA, this::onRecvTrackEmotionInfo);
   }
 
   public int stopFaceEmotion() {
+    Log.i(TAG, "stopFaceEmotion");
+    mEmotionDataBufferList.clear();
     int ret = mMetaBoltSrv.getTrackEngine().stopTrackFaceEmotion();
-    if (ret != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-      return ret;
-    }
     // TODO: video handler
-    stopHandler();
+    mIsOpenAudioEmotion = false;
+    handleSendMediaExtraInfo();
     return ret;
   }
 
+  private boolean mIsOpenDance = false;
   public int startMusicDance(String danceFilePath) {
     Log.i(TAG, "startMusicDance path: " + danceFilePath);
-    int ret = mMetaBoltSrv.getTrackEngine().startTrackMusicDance(danceFilePath, this::onRecvTrackDanceInfo);
-    if (ret != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-      return ret;
-    }
-    startHandler();
-    return ret;
+    mIsOpenDance = true;
+    return mMetaBoltSrv.getTrackEngine().startTrackMusicDance(danceFilePath, this::onRecvTrackDanceInfo);
   }
 
   public int stopMusicDance() {
     Log.i(TAG, "stopMusicDance");
+    mDanceDataBufferList.clear();
     int ret = mMetaBoltSrv.getTrackEngine().stopTrackMusicDance();
-    if (ret != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-      return ret;
-    }
-    stopHandler();
+    mIsOpenDance = false;
+    handleSendMediaExtraInfo();
     return ret;
   }
 
+  private boolean mIsOpenBeat = false;
   public int startMusicBeat(String beatFilePath) {
     Log.i(TAG, "startMusicBeat path: " + beatFilePath);
-    int ret = mMetaBoltSrv.getTrackEngine().startTrackMusicBeat(beatFilePath, this::onRecvTrackBetaInfo);
-    if (ret != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-      return ret;
-    }
-    startHandler();
-    return ret;
+    mIsOpenBeat = true;
+    return mMetaBoltSrv.getTrackEngine().startTrackMusicBeat(beatFilePath, this::onRecvTrackBetaInfo);
   }
 
   public int stopMusicBeat() {
     Log.i(TAG, "stopMusicBeat");
+    mBeatDataBufferList.clear();
     int ret = mMetaBoltSrv.getTrackEngine().stopTrackMusicBeat();
-    if (ret != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-      return ret;
-    }
-    stopHandler();
+    mIsOpenBeat = false;
+    handleSendMediaExtraInfo();
     return ret;
   }
 
-  public int updateMusicPlayProgress(long currentMs, long totalMs) {
-    if (mMetaBoltSrv != null && mMetaBoltSrv.getTrackEngine() != null) {
-      return mMetaBoltSrv.getTrackEngine().updateMusicPlayProgress((int) currentMs, (int) totalMs);
+  private volatile boolean mAudioPlayerStart = false;
+  public void enableAudioPlayStatus(boolean enable) {
+    mAudioPlayerStart = enable;
+  }
+
+  private int updateMusicPlayProgressToMetaBolt() {
+    if (isInit() && (mIsOpenDance || mIsOpenBeat) && mAudioPlayerStart) {
+      if (mMetaBoltSrv != null && mMetaBoltSrv.getTrackEngine() != null) {
+        long currentMs = mMetaFragmentHandler.get().getMusicPlayCurrentProgress();
+        long totalMs = mMetaFragmentHandler.get().getMusicPlayTotalProgress();
+        if (currentMs != -1 && totalMs != -1) {
+          return mMetaBoltSrv.getTrackEngine().updateMusicPlayProgress((int) currentMs, (int) totalMs);
+        }
+      }
     }
     return -1;
   }
@@ -257,14 +258,11 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     mAvatarViewMap.put(index, view);
 
     FrameLayout layout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(index));
-    layout.setOnClickListener(this);
+    layout.setBackgroundColor(Color.GRAY);
     view.setLayoutParams(layout.getLayoutParams());
-    view.setBackgroundColor(getAvatarViewColorIdByIndex(index));
-    layout.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-        ViewGroup.LayoutParams.MATCH_PARENT));
+    layout.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     view.setOnClickListener(this);
-    view.bringToFront();
-    Log.i(TAG, "createAvatarView MTBAvatarView:" + view + ", layout:" + layout);
+    //view.bringToFront();
 
     return 0;
   }
@@ -274,6 +272,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     MTBAvatarView view = mAvatarViewMap.get(index);
     if (view != null) {
       FrameLayout layout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(index));
+      layout.setBackgroundColor(Color.WHITE);
       layout.removeView(view);
       Log.i(TAG, "destroyAvatarView remove view: " + index);
       mAvatarViewMap.remove(index);
@@ -366,6 +365,14 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     return -1;
   }
 
+  public int refresh(int index) {
+    MTBAvatarView view = mAvatarViewMap.get(index);
+    if (view != null) {
+      view.refresh();
+    }
+    return 0;
+  }
+
   public boolean isRoleExist(String uid) {
     return mAvatarRoleMap.get(uid) != null;
   }
@@ -380,11 +387,66 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     mMtbMgrCallback = callback;
   }
 
+  private volatile int mAudioPublishStatus = -1;
   @Override
   public void onJoinRoomSuccess(String channel, String uid, int elapsed) {
     if (mMtbMgrCallback != null) {
       mMtbMgrCallback.onJoinRoomSuccess(channel, uid, elapsed);
     }
+  }
+
+  @Override
+  public void onLocalAudioStatusChanged(int status, int errorReason) {
+//    if (status == ThunderRtcConstant.LocalAudioStreamStatus.THUNDER_LOCAL_AUDIO_STREAM_STATUS_STOPPED ||
+//        status == ThunderRtcConstant.LocalAudioStreamStatus.THUNDER_LOCAL_AUDIO_STREAM_STATUS_FAILED) {
+    if (io.agora.rtc.Constants.LOCAL_AUDIO_STREAM_STATE_STOPPED == status || io.agora.rtc.Constants.LOCAL_AUDIO_STREAM_STATE_FAILED == status) {
+      if (isInit()) {
+        MTBAvatarRole myRole = mAvatarRoleMap.get(UserConfig.kUid);
+        if (myRole != null && mIsOpenAudioEmotion) {
+          myRole.resetFaceEmotion();
+        }
+      }
+    }
+  }
+
+  @Override
+  public void onLocalAudioPublishStatus(int status) {
+    mAudioPublishStatus = status;
+  }
+
+  @Override
+  public void onLeaveRoom() {
+    mRevMediaSEIMap.clear();
+    mSendMediaSEIMap.clear();
+  }
+
+  @Override
+  public void onUserOffline(String uid, int reason) {
+    if (mMtbMgrCallback != null) {
+      mMtbMgrCallback.onUserOffline(uid, reason);
+    }
+
+    Pair<Long, Map<Integer, Integer>> mapObject = mRevMediaSEIMap.get(uid);
+    if (mapObject != null) {
+      mRevMediaSEIMap.remove(uid);
+    }
+  }
+
+  @Override
+  public void onRemoteAudioStopped(String uid, boolean stop) {
+    Log.i(TAG, "onRemoteAudioStopped: " + uid + ", stop: " + stop);
+    if (mMtbMgrCallback != null) {
+      mMtbMgrCallback.onRemoteAudioStopped(uid, stop);
+    }
+
+//        if (stop) {
+//            MTBAvatarRole role = mAvatarRoleMap.get(uid);
+//            if (role != null) {
+//                role.resetFaceEmotion();
+//                role.resetMusicBeat();
+//                role.resetMusicDance();
+//            }
+//        }
   }
 
   /**
@@ -432,10 +494,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     }
   }
 
-  private final Object mRevInfoLock = new Object();
-  byte[] mEmotionData = null;
-  byte[] mBeatData = null;
-  byte[] mDanceData = null;
+  private final Queue<byte[]> mEmotionDataBufferList = new ConcurrentLinkedDeque<>();
+  private final Queue<byte[]> mBeatDataBufferList = new ConcurrentLinkedDeque<>();
+  private final Queue<byte[]> mDanceDataBufferList = new ConcurrentLinkedDeque<>();
 
   @Override
   public int onRecvTrackEmotionInfo(MTBFaceEmotion info) {
@@ -443,10 +504,8 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     if (role != null) {
       role.setFaceEmotion(info);
     }
-
-    synchronized (mRevInfoLock) {
-      mEmotionData = info.serializeToBin();
-    }
+    mEmotionDataBufferList.clear();
+    mEmotionDataBufferList.add(info.serializeToBin());
     return 0;
   }
 
@@ -456,10 +515,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     if (role != null) {
       role.setMusicBeat(info);
     }
-
-    synchronized (mRevInfoLock) {
-      mBeatData = info.serializeToBin();
-    }
+    mBeatDataBufferList.add(info.serializeToBin());
     return 0;
   }
 
@@ -469,37 +525,53 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     if (role != null) {
       role.setMusicDance(info);
     }
-
-    synchronized (mRevInfoLock) {
-      mDanceData = info.serializeToBin();
+    if (mDanceDataBufferList.size() > 3) {
+      Log.i(TAG, "remain too much dance info");
+      mDanceDataBufferList.remove();
     }
+    mDanceDataBufferList.add(info.serializeToBin());
     return 0;
   }
 
-  private int mUseHandlerCnt = 0;
   private void startHandler() {
-    if (mUseHandlerCnt == 0) {
-      mHandler.removeCallbacks(mRunnable);
-      sendMsg(0);
-    }
-    ++mUseHandlerCnt;
+    mHandler = new Handler(Looper.getMainLooper(), this::handleMessage);
+    Log.i(TAG, "start handler");
+    sendMsg(kHandlerDelayMs);
   }
 
   private void stopHandler() {
-    --mUseHandlerCnt;
-    if (mUseHandlerCnt == 0) {
-      mHandler.removeCallbacks(mRunnable);
-    }
+    Log.i(TAG, "stopHandler");
+    mHandler.removeCallbacksAndMessages(null);
+    mHandler = null;
   }
 
   private void sendMsg(long delayMillis) {
-    mHandler.postDelayed(mRunnable, delayMillis);
+    Message msg = Message.obtain();
+    msg.what = MetaBoltHandlerEvent.kRunnable;
+    mHandler.sendMessageDelayed(msg, kHandlerDelayMs);
   }
 
-  private final Runnable mRunnable = () -> {
-    handleSendMediaExtraInfo();
-    sendMsg(mHandlerDelayMs);
-  };
+  private class MetaBoltHandlerEvent {
+    public static final int kRunnable = 1000;
+  }
+
+  @Override
+  public boolean handleMessage(Message msg) {
+    switch (msg.what) {
+      case MetaBoltHandlerEvent.kRunnable:
+        updateMusicPlayProgressToMetaBolt();
+        handleSendMediaExtraInfo();
+        break;
+      default:
+        Log.i(TAG, "handleMessage failed msg what: " + msg.what);
+        break;
+    }
+
+    Message newMsg = Message.obtain();
+    newMsg.what = MetaBoltHandlerEvent.kRunnable;
+    mHandler.sendMessageDelayed(newMsg, kHandlerDelayMs);
+    return false;
+  }
 
   /**
    *  thunder callback by Hsu
@@ -520,79 +592,127 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
    *  type: 2  dance
    *  type: 3  beat
    */
-  private final int kBlendShapeType = 1;
-  private final int kDanceType      = 2;
-  private final int kBeatType       = 3;
-  public void handleSendMediaExtraInfo() {
-    byte[] emotionData = null;
-    byte[] beatData = null;
-    byte[] danceData = null;
-
-    synchronized (mRevInfoLock) {
-      emotionData = mEmotionData;
-      beatData = mBeatData;
-      danceData = mDanceData;
-
-      mEmotionData = null;
-      mBeatData = null;
-      mDanceData = null;
-    }
-
-    String extraInfoStart = "lipsync";
-    int bufferLen = extraInfoStart.length();
-    int typeLen = 3;
-    if (emotionData != null) {
-      bufferLen += emotionData.length + typeLen;
-    }
-
-    if (danceData != null) {
-      bufferLen += danceData.length + typeLen;
-    }
-
-    if (beatData != null) {
-      bufferLen += beatData.length + typeLen;
-    }
-
-    ByteBuffer byteBuffer = ByteBuffer.allocate(bufferLen);
-    byteBuffer.put("lipsync".getBytes());
-
-    if (emotionData != null) {
-      byteBuffer.put((byte)kBlendShapeType);
-      byteBuffer.put(ByteUtil.integerToTwoBytes(emotionData.length));
-      byteBuffer.put(emotionData);
-    }
-
-    if (danceData != null) {
-      byteBuffer.put((byte)kDanceType);
-      byteBuffer.put(ByteUtil.integerToTwoBytes(danceData.length));
-      byteBuffer.put(danceData);
-    }
-
-    if (beatData != null) {
-      byteBuffer.put((byte)kBeatType);
-      byteBuffer.put(ByteUtil.integerToTwoBytes(beatData.length));
-      byteBuffer.put(beatData);
-    }
-
-    int sendBufferLen = byteBuffer.array().length;
-    if (sendBufferLen != 0) {
-//      int ret = mMetaFragmentHandler.get().onAudioSEIData(byteBuffer.array());
-//      if (ret != 0 || sendBufferLen > 500) { // 500 is max SEI length of audio opus dse
-//        Log.e(TAG, "send SEI failed, ret: " + ret + ", length: " + sendBufferLen);
-//      }
-    }
-  }
-
   private final String kLipsyncFlag = "lipsync";
   private final int kSEIStartLen = kLipsyncFlag.getBytes().length;
 
-  private int mRevMediaExtraInfoCnt = 0;
+  private final int kBlendShapeType = 1;
+  private final int kDanceType      = 2;
+  private final int kBeatType       = 3;
+  private String switchTypeToString(int type) {
+    if (type == kBlendShapeType) {
+      return "bs";
+    } else if (type == kDanceType) {
+      return "dance";
+    } else if (type == kBeatType) {
+      return "beat";
+    } else {
+      return "unknown";
+    }
+  }
+
+  private long mLastSendSEITimestamp = 0;
+  private final Map<Integer, Integer> mSendMediaSEIMap = new ConcurrentHashMap<>();
+  public void handleSendMediaExtraInfo() {
+    if ((mIsOpenAudioEmotion || mIsOpenDance || mIsOpenBeat) &&
+        mAudioPublishStatus == io.agora.rtc.Constants.PUB_STATE_PUBLISHED) {
+
+      if (mEmotionDataBufferList.isEmpty() && mDanceDataBufferList.isEmpty() && mBeatDataBufferList.isEmpty()) {
+        return;
+      }
+
+      if (mSendMediaSEIMap.isEmpty()) {
+        mSendMediaSEIMap.put(kBlendShapeType, 0);
+        mSendMediaSEIMap.put(kDanceType, 0);
+        mSendMediaSEIMap.put(kBeatType, 0);
+        mLastSendSEITimestamp = System.currentTimeMillis();
+      }
+
+      int bufferLen = kSEIStartLen;
+      int typeLen = 3;
+
+      byte[] emotionData = mEmotionDataBufferList.poll();
+      if (emotionData != null) {
+        bufferLen += emotionData.length + typeLen;
+      }
+
+      byte[] danceData = mDanceDataBufferList.poll();
+      if (danceData != null) {
+        bufferLen += danceData.length + typeLen;
+      }
+
+      byte[] beatData = mBeatDataBufferList.poll();
+      if (beatData != null) {
+        bufferLen += beatData.length + typeLen;
+      }
+
+      ByteBuffer byteBuffer = ByteBuffer.allocate(bufferLen);
+      byteBuffer.put(kLipsyncFlag.getBytes());
+
+      int type = -1;
+      if (emotionData != null) {
+        type = kBlendShapeType;
+        byteBuffer.put((byte) type);
+        byteBuffer.put(ByteUtil.integerToTwoBytes(emotionData.length));
+        byteBuffer.put(emotionData);
+        mSendMediaSEIMap.put(type, mSendMediaSEIMap.get(type) + 1);
+      }
+
+      if (danceData != null) {
+        type = kDanceType;
+        byteBuffer.put((byte) type);
+        byteBuffer.put(ByteUtil.integerToTwoBytes(danceData.length));
+        byteBuffer.put(danceData);
+        mSendMediaSEIMap.put(type, mSendMediaSEIMap.get(type) + 1);
+      }
+
+      if (beatData != null) {
+        type = kBeatType;
+        byteBuffer.put((byte) type);
+        byteBuffer.put(ByteUtil.integerToTwoBytes(beatData.length));
+        byteBuffer.put(beatData);
+        mSendMediaSEIMap.put(type, mSendMediaSEIMap.get(type) + 1);
+      }
+
+      int sendBufferLen = byteBuffer.array().length;
+      if (sendBufferLen > kSEIStartLen) {
+        int ret = mMetaFragmentHandler.get().onAudioSEIData(byteBuffer);
+        if (ret != 0 || sendBufferLen > 500) { // 500 is max SEI length of audio opus dse
+          Log.e(TAG, "send SEI failed, ret: " + ret + ", length: " + sendBufferLen);
+        }
+
+        long currentTimestamp = System.currentTimeMillis();
+        if ((currentTimestamp - mLastSendSEITimestamp) > 1000) {
+          mLastSendSEITimestamp = currentTimestamp;
+          StringBuilder stringBuilder = new StringBuilder();
+          stringBuilder.append("handleSendMediaExtraInfo ");
+          for (Map.Entry<Integer, Integer> entry : mSendMediaSEIMap.entrySet()) {
+            stringBuilder.append(" { type: ");
+            stringBuilder.append(switchTypeToString(entry.getKey()));
+            stringBuilder.append(", count: ");
+            stringBuilder.append(entry.getValue());
+            stringBuilder.append(" } ");
+            mSendMediaSEIMap.put(entry.getKey(), 0);
+          }
+          Log.i(TAG, stringBuilder.toString());
+        }
+      }
+    }
+  }
+
+  private Map<String, Pair<Long, Map<Integer, Integer>>> mRevMediaSEIMap = new ConcurrentHashMap<>(); // uid -> <type, nums>
   @Override
   public void handleRecvMediaExtraInfo(String uid, byte[] data, int dataLen) {
-    //if (mRevMediaExtraInfoCnt % 100 == 0) {
-      Log.i(TAG, "handleRecvMediaExtraInfo uid:" + uid + ", base64 dataLen:" + dataLen);
-    //}
-    mRevMediaExtraInfoCnt++;
+    Pair<Long, Map<Integer, Integer>> revMediaInfoPair = mRevMediaSEIMap.get(uid);
+    if (revMediaInfoPair == null) {
+      Map<Integer, Integer> newRevMediaSEIUidMap = new ConcurrentHashMap<>();
+      newRevMediaSEIUidMap.put(kBlendShapeType, 0);
+      newRevMediaSEIUidMap.put(kDanceType, 0);
+      newRevMediaSEIUidMap.put(kBeatType, 0);
+
+      revMediaInfoPair = new Pair<>((long) 0, newRevMediaSEIUidMap);
+      mRevMediaSEIMap.put(uid, revMediaInfoPair);
+    }
+
     if (mMetaBoltSrv != null) {
       byte[] startData = ByteUtil.subByte(data, 0, kSEIStartLen);
       String startStr = new String(startData, StandardCharsets.UTF_8);
@@ -627,6 +747,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
         }
         remnantLen = remnantLen - typeLine - parseDataLen;
         offsetLen = offsetLen + parseDataLen;
+        revMediaInfoPair.second.put(trackType, revMediaInfoPair.second.get(trackType) + 1);
       }
 
       if (emotionData != null || beatData != null || danceData != null) {
@@ -668,6 +789,28 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
             Log.e(TAG, " beat info unserialize from bin failed, data: " + Base64.encodeToString(beatData, Base64.NO_WRAP));
           }
         }
+
+        long currentTimestamp = System.currentTimeMillis();
+        long lastTimestamp = revMediaInfoPair.first;
+        if ((currentTimestamp - lastTimestamp) > 1000) {
+          Pair<Long, Map<Integer, Integer>> newPair = new Pair<>(currentTimestamp, revMediaInfoPair.second);
+          mRevMediaSEIMap.put(uid, newPair);
+          StringBuilder stringBuilder = new StringBuilder();
+          stringBuilder.append("handleRecvMediaExtraInfo ");
+          stringBuilder.append("{ uid: ");
+          stringBuilder.append(uid);
+          stringBuilder.append(", rev media SEI: ");
+          for (Map.Entry<Integer, Integer> entry : revMediaInfoPair.second.entrySet()) {
+            stringBuilder.append("[type: ");
+            stringBuilder.append(switchTypeToString(entry.getKey()));
+            stringBuilder.append(", num: ");
+            stringBuilder.append(entry.getValue());
+            stringBuilder.append("]");
+            revMediaInfoPair.second.put(entry.getKey(), 0);
+          }
+          stringBuilder.append(" }");
+          Log.i(TAG, stringBuilder.toString());
+        }
       }
     }
   }
@@ -676,27 +819,12 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
    *  UI
    */
   private int getAvatarContainerViewIdByIndex(int index) {
-//    if (index == 0) {
-//      return R.id.avatar_view_container_0;
-//    } else if (index == 1) {
-//      return R.id.avatar_view_container_1;
-//    } else if (index == 2) {
-//      return R.id.avatar_view_container_2;
-//    } else if (index == 3) {
-//      return R.id.avatar_view_container_3;
-//    } else if (index == 4) {
-//      return R.id.avatar_view_container_4;
-//    } else if (index == 5) {
-//      return R.id.avatar_view_container_5;
-//    }
-//    return R.id.avatar_view_container_6;
     switch (index) {
-      case 1:
-        return R.id.fl_remote_meta;
-      default:
+      case 0:
         return R.id.fl_local_meta;
+      default:
+        return R.id.fl_remote_meta;
     }
-//    return R.id.fl_local;
   }
 
   private int getAvatarViewColorIdByIndex(int index) {
@@ -716,9 +844,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     return Color.LTGRAY;
   }
 
-  boolean mIsFullScreen = false;
+  boolean mIsFullScreenNow = false;
   private void controlOtherView(boolean hide) {
-//    int value = hide ? View.INVISIBLE : View.VISIBLE;
+//    int value = hide ? View.GONE : View.VISIBLE;
 //    mRootView.get().findViewById(R.id.meta_view_rect).setVisibility(value);
 //    mRootView.get().findViewById(R.id.meta_tab_host_test).setVisibility(value);
 //    mRootView.get().findViewById(R.id.meta_tab_host_test2).setVisibility(value);
@@ -726,76 +854,103 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 
   @Override
   public void onClick(View view) {
-    Log.i(TAG, "onClick view:" + view);
+//    Log.i(TAG, "onClick, is full view now: " + mIsFullScreenNow + ", view object: " + view);
 //    LinearLayout fullLayout = mRootView.get().findViewById(R.id.metabolt_full_view_container);
 //    if (fullLayout == null) {
 //      return ;
 //    }
-//    mIsFullScreen = !mIsFullScreen;
-//    if (mIsFullScreen) {
-//      // 全屏
-//      int findIndex = -1;
-//      for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
-//        entry.getValue().setVisibility(View.INVISIBLE);
-//        if (entry.getValue() == view) {
-//          findIndex = entry.getKey();
-//        }
-//      }
 //
-//      if (findIndex != -1) {
+//    try {
+//      // OPPO-CPH2127总是在这里报错：java.lang.IllegalStateException: The specified child already has a parent. You must call removeView() on the child's parent first.
+//      int findIndex = -1;
+//      if (!mIsFullScreenNow) {
+//        // 放大变全屏
+//        for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
+//          if (entry.getValue() == view) {
+//            findIndex = entry.getKey();
+//            entry.getValue().setShowOnTop(false);
+//          }
+//        }
+//
+//        if (findIndex != -1) {
+//          fullLayout.removeAllViews();
+//          fullLayout.setVisibility(View.VISIBLE);
+//          controlOtherView(true);
+//          ViewParent parent = view.getParent();
+//          if (parent!=null) {
+//            ((ViewGroup)parent).removeView(view);
+//          }
+//          view.setLayoutParams(new LinearLayout.LayoutParams(
+//              ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
+//          fullLayout.addView(view);
+//          view.setVisibility(View.VISIBLE);
+//          ((MTBAvatarView)view).setShowOnTop(true);
+//        }
+//
+//        mIsFullScreenNow = !mIsFullScreenNow;
+//      } else {
+//        // 还原非全屏
+//        ViewParent parent = view.getParent();
+//        if (parent!=null) {
+//          ((ViewGroup)parent).removeView(view);
+//        }
+//        if (view instanceof MTBAvatarView) {
+//          ((MTBAvatarView)view).setShowOnTop(false);
+//        }
+//        controlOtherView(false);
+//        fullLayout.removeAllViews();
+//        fullLayout.setVisibility(View.GONE);
+//        for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
+//          if (entry.getValue() == view) {
+//            findIndex = entry.getKey();
+//          }
+//        }
 //        int containerId = getAvatarContainerViewIdByIndex(findIndex);
 //        LinearLayout windowLayout = mRootView.get().findViewById(containerId);
-//        windowLayout.removeView(view);
-//        controlOtherView(true);
-//        fullLayout.addView(view);
-//        fullLayout.setVisibility(View.VISIBLE);
-//        view.setVisibility(View.VISIBLE);
-//      }
-//    } else {
-//      // 非全屏
-//      fullLayout.removeView(view);
-//      fullLayout.setVisibility(View.GONE);
+//        windowLayout.addView(view);
 //
-//      controlOtherView(false);
-//      for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
-//        int containerId = getAvatarContainerViewIdByIndex(entry.getKey());
-//        LinearLayout windowLayout = mRootView.get().findViewById(containerId);
-//        windowLayout.setVisibility(View.VISIBLE);
-//        if (entry.getValue() == view) {
-//          windowLayout.addView(view);
-//        } else {
-//          entry.getValue().refresh();
-//        }
-//        entry.getValue().setVisibility(View.VISIBLE);
+//        mIsFullScreenNow = !mIsFullScreenNow;
 //      }
+//    } catch (Exception e) {
+//      Log.e(TAG, e.getMessage());
+//      onClick(view);
 //    }
   }
 
   public void onHiddenChanged(boolean hidden) {
-    for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
-      MTBAvatarView view = entry.getValue();
-      Integer viewIndex = entry.getKey();
-      int containerId = getAvatarContainerViewIdByIndex(viewIndex);
-      FrameLayout layout = mRootView.get().findViewById(containerId);
-
-      if (hidden) {
-        layout.removeView(view);
-        layout.setVisibility(View.INVISIBLE);
-        view.setVisibility(View.INVISIBLE);
-      } else {
-        layout.addView(view);
-        layout.setVisibility(View.VISIBLE);
-        view.setVisibility(View.VISIBLE);
-        view.refresh();
-      }
-    }
-
+//    if (mIsFullScreenNow) {
+//      LinearLayout fullLayout = mRootView.get().findViewById(R.id.metabolt_full_view_container);
+//      if (hidden) {
+//        fullLayout.setVisibility(View.GONE);
+//      } else {
+//        fullLayout.setVisibility(View.VISIBLE);
+//        View childView = fullLayout.getChildAt(0);
+//        ((MTBAvatarView)childView).refresh();
+//      }
+//    } else {
+//      controlOtherView(hidden);
+//      if (!hidden) {
+//        for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
+//          MTBAvatarView view = entry.getValue();
+//          view.setVisibility(View.VISIBLE);
+//          view.refresh();
+//        }
+//      }
+//    }
   }
 
   public void resumeView() {
-    for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
-      MTBAvatarView view = entry.getValue();
-      view.refresh();
-    }
+//    if (mIsFullScreenNow) {
+//      controlOtherView(true);
+//      LinearLayout fullLayout = mRootView.get().findViewById(R.id.metabolt_full_view_container);
+//      fullLayout.setVisibility(View.VISIBLE);
+//    } else {
+//      controlOtherView(false);
+//      for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
+//        MTBAvatarView view = entry.getValue();
+//        view.setVisibility(View.VISIBLE);
+//        view.refresh();
+//      }
+//    }
   }
 }
