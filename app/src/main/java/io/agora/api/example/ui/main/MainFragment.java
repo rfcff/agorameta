@@ -25,8 +25,6 @@ import android.widget.Toast;
 
 import com.metabolt.MTBServiceConfig;
 import com.metabolt.MetaBoltTypes;
-import com.yanzhenjie.permission.AndPermission;
-import com.yanzhenjie.permission.runtime.Permission;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -46,6 +44,7 @@ import io.agora.api.example.utils.IMetaBoltDataHandler;
 import io.agora.api.example.utils.IMetaFragmentHandler;
 import io.agora.api.example.utils.MetaBoltManager;
 import io.agora.api.example.utils.MetaBoltMgrCallback;
+import io.agora.api.example.utils.PermissionUtils;
 import io.agora.api.example.utils.TokenUtils;
 import io.agora.api.example.utils.UserConfig;
 import io.agora.rtc.AudioFrame;
@@ -83,7 +82,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private EditText et_channel;
   private RtcEngine engine;
   private boolean isUserJoined = false;
-  private int playMusicState = PLAY_MUSIC_IDLE;
+  private int mAudioMixingState = io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED;
+  private int mAudioDuration = 0;
   private static final Integer SAMPLE_RATE = 44100;
   private static final Integer SAMPLE_NUM_OF_CHANNEL = 2;
   private static final Integer BIT_PER_SAMPLE = 16;
@@ -157,9 +157,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
        * @param handler IRtcEngineEventHandler is an abstract class providing default implementation.
        *                The SDK uses this class to report to the app on SDK runtime events.*/
       engine = RtcEngine.create(context.getApplicationContext(), getString(R.string.agora_app_id), iRtcEngineEventHandler);
-//      String dir = Environment.getExternalStorageDirectory().getAbsolutePath();
-//      String dir1 = context.getExternalFilesDir(null).getAbsolutePath();
-//      Log.i(TAG, "dir: " + dir + ", dir1: " + dir1);
     }
     catch (Exception e) {
       e.printStackTrace();
@@ -169,7 +166,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     downResource();
     copyResource();
     initMetaService();
-    // TokenUtils.instance().requestTokenV2(getActivity(), UserConfig.kAppId, UserConfig.kUid, UserConfig.kChannelId, UserConfig.kTokenInvalidTime);
   }
 
   @Override
@@ -184,7 +180,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     MetaBoltManager.instance().deInit();
   }
 
-  protected void showAlert(String message)
+  protected void showInnerAlert(String message)
   {
     mMainLooperHandler.post(()->{
       Context context = getContext();
@@ -197,7 +193,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           .show();
     });
   }
-  protected final void showLongToast(final String msg)
+  protected final void showInnerToast(final String msg)
   {
     mMainLooperHandler.post(new Runnable()
     {
@@ -221,7 +217,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       case R.id.btn_join: {
         if (isUserJoined) {
           isUserJoined = false;
-          playMusicState = PLAY_MUSIC_IDLE;
+          mAudioMixingState = io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED;
           mIsRemoteVideoViewNeedShow = false;
           mIsRemoteMetaViewNeedShow = false;
           mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;
@@ -243,15 +239,14 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         break;
       }
       case R.id.btn_play_music: {
-        if (PLAY_MUSIC_PLAY == playMusicState) {
+        if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING == mAudioMixingState) {
           btn_play_music.setText(R.string.play_music);
-          playMusicState = PLAY_MUSIC_PAUSE;
           engine.pauseAudioMixing();
-          // engine.stopAudioMixing();
           MetaBoltManager.instance().stopMusicDance();
-        } else if (PLAY_MUSIC_IDLE == playMusicState) {
+        } else if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED == mAudioMixingState
+            || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED == mAudioMixingState
+            || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PAUSED == mAudioMixingState) {
           btn_play_music.setText(R.string.pause_music);
-          playMusicState = PLAY_MUSIC_PLAY;
           String music = getMusicPath();
           int ret = engine.startAudioMixing(music, false, false, 1, 0);
           if (Constants.ERR_OK != ret) {
@@ -263,10 +258,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           }
           String danceMusic = getNewDanceDownPath();
           MetaBoltManager.instance().startMusicDance(danceMusic);
-        } else if (PLAY_MUSIC_PAUSE == playMusicState) {
-          btn_play_music.setText(R.string.pause_music);
-          playMusicState = PLAY_MUSIC_PLAY;
-          engine.resumeAudioMixing();
         }
         break;
       }
@@ -282,34 +273,35 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     String uid = et_uid.getText().toString();
     String channelId = et_channel.getText().toString();
     if (uid.isEmpty() || channelId.isEmpty()) {
-      showLongToast("uid或者channelId不能为空!");
+      showInnerToast("uid或者channelId不能为空!");
       return;
     }
     UserConfig.kUid = uid;
     UserConfig.kChannelId = channelId;
     TokenUtils.instance().requestTokenV2(getActivity(),
         UserConfig.kAppId, UserConfig.kUid, UserConfig.kChannelId, UserConfig.kTokenInvalidTime, this);
-    if (AndPermission.hasPermissions(this, Permission.Group.STORAGE, Permission.Group.MICROPHONE, Permission.Group.CAMERA)) {
-      return;
-    }
-    // Request permission
-    AndPermission.with(this).runtime().permission(
-        Permission.Group.STORAGE,
-        Permission.Group.MICROPHONE,
-        Permission.Group.CAMERA
-    ).onGranted(permissions ->
-    {
-      // Permissions Granted
-    }).start();
+    PermissionUtils.checkPermissionAllGranted(getActivity());
+//    if (AndPermission.hasPermissions(this, Permission.Group.STORAGE, Permission.Group.MICROPHONE, Permission.Group.CAMERA)) {
+//      return;
+//    }
+//    // Request permission
+//    AndPermission.with(this).runtime().permission(
+//        Permission.Group.STORAGE,
+//        Permission.Group.MICROPHONE,
+//        Permission.Group.CAMERA
+//    ).onGranted(permissions ->
+//    {
+//      // Permissions Granted
+//    }).start();
   }
 
   @Override
   public void onRequestTokenResult(int code, String token, String extra) {
     if (0 == code && token != null) {
       UserConfig.kToken = token;
-      showLongToast("请求token成功");
+      showInnerToast("请求token成功");
     } else {
-      showLongToast("请求token失败, code:" + code + ", extra:" + extra);
+      showInnerToast("请求token失败, code:" + code + ", extra:" + extra);
     }
   }
 
@@ -341,7 +333,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     public void onLeaveChannel(RtcStats stats) {
       super.onLeaveChannel(stats);
       Log.i(TAG, String.format("local user %d leaveChannel!", UserConfig.kUid));
-      showLongToast(String.format("local user %d leaveChannel!", UserConfig.kUid));
+      showInnerToast(String.format("local user %d leaveChannel!", UserConfig.kUid));
       if (null != mMetaBoltDataHandler) {
         mMetaBoltDataHandler.onLeaveRoom();
       }
@@ -356,7 +348,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     @Override
     public void onJoinChannelSuccess(String channel, int uid, int elapsed) {
       Log.i(TAG, String.format("onJoinChannelSuccess channel %s uid %d", channel, uid));
-      showLongToast(String.format("onJoinChannelSuccess channel %s uid %d", channel, uid));
+      showInnerToast(String.format("onJoinChannelSuccess channel %s uid %d", channel, uid));
       isUserJoined = true;
       mMainLooperHandler.post(new Runnable() {
         @Override
@@ -368,9 +360,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           dataStreamConfig.ordered = true;
           dataStreamConfig.syncWithAudio = true;
           mLocalAudioStreamId = engine.createDataStream(dataStreamConfig);
-          if (mLocalAudioStreamId < Constants.ERR_OK) {
-            Log.e(TAG, "createDataStream error:" + RtcEngine.getErrorDescription(mLocalAudioStreamId));
-          }
 
           if (null != mMetaBoltDataHandler) {
             mMetaBoltDataHandler.onJoinRoomSuccess(UserConfig.kChannelId, UserConfig.kUid, elapsed);
@@ -387,7 +376,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     public void onUserJoined(int uid, int elapsed) {
       super.onUserJoined(uid, elapsed);
       Log.i(TAG, "onUserJoined->" + uid);
-      showLongToast(String.format("user %d joined!", uid));
+      showInnerToast(String.format("user %d joined!", uid));
       /**Check if the context is correct*/
       Context context = getContext();
       if (context == null) {
@@ -398,7 +387,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         mRemoteUid = String.valueOf(uid);
         /**Display remote video stream*/
         if (addRemoteVideoView(context) < 0) {
-          showLongToast("添加" + uid + "视图失败");
+          showInnerToast("添加" + uid + "视图失败");
           mIsRemoteVideoViewNeedShow = true;
         } else {
           mIsRemoteVideoViewNeedShow = false;
@@ -427,7 +416,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     @Override
     public void onUserOffline(int uid, int reason) {
       Log.i(TAG, String.format("user %d offline! reason:%d", uid, reason));
-      showLongToast(String.format("user %d offline! reason:%d", uid, reason));
+      showInnerToast(String.format("user %d offline! reason:%d", uid, reason));
       mMainLooperHandler.post(new Runnable() {
         @Override
         public void run() {
@@ -501,12 +490,37 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     }
 
     @Override
+    public void onAudioMixingStateChanged(int state, int reason) {
+      Log.d(TAG, "onAudioMixingStateChanged state:" + state + ", reason:" + reason);
+      mAudioMixingState = state;
+      switch (state) {
+        case io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING: {
+          MetaBoltManager.instance().enableAudioPlayStatus(true);
+          break;
+        }
+        case io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED:
+        case io.agora.rtc2.Constants.AUDIO_MIXING_STATE_FAILED: {
+          MetaBoltManager.instance().enableAudioPlayStatus(false);
+          break;
+        }
+        case io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED: {
+          MetaBoltManager.instance().stopMusicDance();
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    @Override
     public void onVideoPublishStateChanged(String channel, int oldState, int newState, int elapseSinceLastState) {
     }
 
     @Override
     public void onLocalVideoStateChanged(int localVideoState, int error) {
     }
+
+
   };
 
 
@@ -559,7 +573,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
      * samplesPerCall	Sets the number of samples returned in the onRecordAudioFrame callback. samplesPerCall is usually set as 1024 for RTMP streaming.
      * The SDK triggers the onRecordAudioFrame callback according to the sample interval. Ensure that the sample interval ≥ 0.01 (s). And, Sample interval (sec) = samplePerCall/(sampleRate × channel).
      */
-    engine.setRecordingAudioFrameParameters(4000, 1, Constants.RAW_AUDIO_FRAME_OP_MODE_READ_ONLY, 1024);
+    engine.setRecordingAudioFrameParameters(16000, 2, Constants.RAW_AUDIO_FRAME_OP_MODE_READ_WRITE, 1024);
 
     /**
      * Sets the audio playback format for the onPlaybackAudioFrame callback.
@@ -571,14 +585,14 @@ public class MainFragment extends Fragment implements View.OnClickListener,
      * samplesPerCall	Sets the number of samples returned in the onRecordAudioFrame callback. samplesPerCall is usually set as 1024 for RTMP streaming.
      * The SDK triggers the onRecordAudioFrame callback according to the sample interval. Ensure that the sample interval ≥ 0.01 (s). And, Sample interval (sec) = samplePerCall/(sampleRate × channel).
      */
-    engine.setPlaybackAudioFrameParameters(4000, 1, Constants.RAW_AUDIO_FRAME_OP_MODE_READ_ONLY, 1024);
+    engine.setPlaybackAudioFrameParameters(16000, 2, Constants.RAW_AUDIO_FRAME_OP_MODE_READ_ONLY, 1024);
 
     /**
      * Sets the mixed audio format for the onMixedAudioFrame callback.
      * sampleRate	Sets the sample rate (samplesPerSec) returned in the onMixedAudioFrame callback, which can be set as 8000, 16000, 32000, 44100, or 48000 Hz.
      * samplesPerCall	Sets the number of samples (samples) returned in the onMixedAudioFrame callback. samplesPerCall is usually set as 1024 for RTMP streaming.
      */
-    engine.setMixedAudioFrameParameters(8000, 1024);
+    engine.setMixedAudioFrameParameters(32000, 1024);
 
     engine.registerVideoFrameObserver(iVideoFrameObserver);
 
@@ -604,7 +618,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       // Error code description can be found at:
       // en: https://docs.agora.io/en/Voice/API%20Reference/java/classio_1_1agora_1_1rtc_1_1_i_rtc_engine_event_handler_1_1_error_code.html
       // cn: https://docs.agora.io/cn/Voice/API%20Reference/java/classio_1_1agora_1_1rtc_1_1_i_rtc_engine_event_handler_1_1_error_code.html
-      showAlert(RtcEngine.getErrorDescription(Math.abs(res)));
+      showInnerAlert(RtcEngine.getErrorDescription(Math.abs(res)));
       return;
     }
     // Prevent repeated entry
@@ -682,8 +696,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private final IAudioFrameObserver audioFrameObserver = new IAudioFrameObserver() {
     @Override
     public boolean onRecordFrame(AudioFrame audioFrame) {
+      Log.i(TAG, "onRecordAudioFrame " + audioFrame.toString());
       int length = audioFrame.samples.limit();
-      //Log.i(TAG, "onRecordAudioFrame " + audioFrame.toString());
       byte[] buffer = new byte[length];
       audioFrame.samples.get(buffer);
       mMetaBoltDataHandler.handlerCaptureAudioData(buffer,
@@ -707,6 +721,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
     @Override
     public boolean onMixedFrame(AudioFrame audioFrame) {
+      Log.i(TAG, "onMixedFrame " + audioFrame.toString());
       return false;
     }
 
@@ -800,7 +815,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
             MetaBoltManager.instance().createAvatarView(context, 0);
             MetaBoltManager.instance().createAvatarRole(getRoleModelPath(kRoleModelFemale), UserConfig.kUid);
             MetaBoltManager.instance().setRoleIndex(0, UserConfig.kUid);
-            MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF);
+            MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_WHOLE);
             // MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HEAD);
 
             MetaBoltManager.instance().setAnimation(UserConfig.kUid, getAnimationDownPath());
@@ -928,7 +943,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     mMainLooperHandler.post(new Runnable() {
       @Override
       public void run() {
-        showLongToast("下载资源出错,请检查网络");
+        showInnerToast("下载资源出错,请检查网络");
       }
     });
   }
@@ -1131,24 +1146,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     }
   }
 
-//    @Override
-//    public void onEmotionBinData(byte[] data) {
-//
-//    }
-//
-//    @Override
-//    public void onDanceBinData(byte[] data) {
-//
-//    }
-//
-//    @Override
-//    public void onBetaBinData(byte[] data) {
-//
-//    }
-
   @Override
   public void onStateMsgCallback(String msg) {
-
+    Log.i(TAG, "[onStateMsgCallback] " + msg);
   }
 
   @Override
@@ -1157,17 +1157,26 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     byte[] buffer = new byte[byteBuffer.limit()];
     byteBuffer.get(buffer);
     int ret = engine.sendStreamMessage(mLocalAudioStreamId, buffer);
+    if (ret < Constants.ERR_OK) {
+      Log.e(TAG, "sendStreamMessage error:" + ret + ", desc:" + RtcEngine.getErrorDescription(ret));
+    }
     buffer = null;
     return ret;
   }
 
   @Override
   public long getMusicPlayCurrentProgress() {
-    return 0;
+    //if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING != mAudioMixingState) return 0;
+    int pos = engine.getAudioMixingCurrentPosition();
+    Log.i(TAG, "AudioMixing music progress position:" + pos);
+    return pos;
   }
 
   @Override
   public long getMusicPlayTotalProgress() {
-    return 0;
+    //if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING != mAudioMixingState) return 0;
+    mAudioDuration = engine.getAudioMixingDuration();
+    Log.i(TAG, "AudioMixing music progress total:" + mAudioDuration);
+    return mAudioDuration;
   }
 }

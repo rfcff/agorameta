@@ -193,6 +193,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
   private boolean mIsOpenDance = false;
   public int startMusicDance(String danceFilePath) {
     Log.i(TAG, "startMusicDance path: " + danceFilePath);
+    if (null == mMetaBoltSrv) return -1;
     mIsOpenDance = true;
     return mMetaBoltSrv.getTrackEngine().startTrackMusicDance(danceFilePath, this::onRecvTrackDanceInfo);
   }
@@ -200,6 +201,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
   public int stopMusicDance() {
     Log.i(TAG, "stopMusicDance");
     mDanceDataBufferList.clear();
+    if (null == mMetaBoltSrv) return -1;
     int ret = mMetaBoltSrv.getTrackEngine().stopTrackMusicDance();
     mIsOpenDance = false;
     handleSendMediaExtraInfo();
