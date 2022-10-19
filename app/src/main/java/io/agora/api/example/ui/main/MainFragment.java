@@ -1184,14 +1184,24 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     Log.i(TAG, "[onStateMsgCallback] " + msg);
   }
 
+  private boolean needPrint = true;
   @Override
   public int onAudioSEIData(ByteBuffer byteBuffer) {
     byteBuffer.rewind();
     byte[] buffer = new byte[byteBuffer.limit()];
     byteBuffer.get(buffer);
-    int ret = engine.sendStreamMessage(mLocalAudioStreamId, buffer);
-    if (ret < Constants.ERR_OK) {
-      Log.e(TAG, "sendStreamMessage error:" + ret + ", desc:" + RtcEngine.getErrorDescription(ret));
+    int type = buffer[MetaBoltManager.kSEIStartLen];
+    int ret = 0;
+    if (MetaBoltManager.kDanceType != type) {
+      ret = engine.sendStreamMessage(mLocalAudioStreamId, buffer);
+      if (ret < Constants.ERR_OK) {
+        Log.e(TAG, "sendStreamMessage error:" + ret + ", desc:" + RtcEngine.getErrorDescription(ret));
+      }
+    } else {
+      if (needPrint) {
+        needPrint = false;
+        Log.i(TAG, "kDanceType data size bigger than agora sendStreamMessage permitted, need not send to remote");
+      }
     }
     buffer = null;
     return ret;

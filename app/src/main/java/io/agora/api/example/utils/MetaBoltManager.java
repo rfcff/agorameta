@@ -593,11 +593,11 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
    *  type: 3  beat
    */
   private final static String kLipsyncFlag = "lipsync";
-  private final static int kSEIStartLen = kLipsyncFlag.getBytes().length;
+  public final static int kSEIStartLen = kLipsyncFlag.getBytes().length;
 
-  private final int kBlendShapeType = 1;
-  private final int kDanceType      = 2;
-  private final int kBeatType       = 3;
+  public final static int kBlendShapeType = 1;
+  public final static int kDanceType      = 2;
+  public final static int kBeatType       = 3;
   private String switchTypeToString(int type) {
     if (type == kBlendShapeType) {
       return "bs";
