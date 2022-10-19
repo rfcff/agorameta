@@ -132,11 +132,19 @@
         android:text="@string/req_token" />
 
     <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/btn_play_music"
+        android:id="@+id/btn_music_dance"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/btn_req_token"
-        android:text="@string/play_music" />
+        android:text="@string/start_music_dance" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/btn_music_beat"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/btn_music_dance"
+        android:text="@string/start_music_beat" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

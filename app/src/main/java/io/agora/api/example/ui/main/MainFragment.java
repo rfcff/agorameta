@@ -77,7 +77,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private boolean mIsRemoteMetaViewNeedShow = false;
   private String mRemoteUid = null;
   private FrameLayout fl_local_meta, fl_local, fl_remote_meta, fl_remote;
-  private Button btn_join, btn_req_token, btn_play_music;
+  private Button btn_join, btn_req_token, btn_music_dance, btn_music_beat;
   private EditText et_uid;
   private EditText et_channel;
   private RtcEngine engine;
@@ -126,10 +126,12 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     super.onViewCreated(view, savedInstanceState);
     btn_join = view.findViewById(R.id.btn_join);
     btn_req_token = view.findViewById(R.id.btn_req_token);
-    btn_play_music = view.findViewById(R.id.btn_play_music);
+    btn_music_dance = view.findViewById(R.id.btn_music_dance);
+    btn_music_beat = view.findViewById(R.id.btn_music_beat);
     btn_join.setOnClickListener(this);
     btn_req_token.setOnClickListener(this);
-    btn_play_music.setOnClickListener(this);
+    btn_music_dance.setOnClickListener(this);
+    btn_music_beat.setOnClickListener(this);
     et_uid = view.findViewById(R.id.et_uid);
     et_uid.setText(String.valueOf(ThreadLocalRandom.current().nextInt(100000, 999999)));
     et_channel = view.findViewById(R.id.et_channel);
@@ -238,26 +240,57 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         }
         break;
       }
-      case R.id.btn_play_music: {
+      case R.id.btn_music_dance: {
         if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING == mAudioMixingState) {
-          btn_play_music.setText(R.string.play_music);
+          btn_music_dance.setText(R.string.start_music_dance);
           engine.pauseAudioMixing();
           MetaBoltManager.instance().stopMusicDance();
         } else if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PAUSED == mAudioMixingState) {
-          btn_play_music.setText(R.string.pause_music);
+          btn_music_dance.setText(R.string.stop_music_dance);
           String music = getMusicPath();
-          int ret = engine.startAudioMixing(music, false, false, 1, 0);
-          if (Constants.ERR_OK != ret) {
-            Log.e(TAG, "startAudioMixing " + music + " failed " + engine.getErrorDescription(ret));
-          }
-          ret = engine.getAudioFileInfo(music);
-          if (Constants.ERR_OK != ret) {
-            Log.e(TAG, "getAudioFileInfo " + music + " failed " + engine.getErrorDescription(ret));
+          if (0 == engine.getAudioMixingCurrentPosition()) {
+            int ret = engine.startAudioMixing(music, false, false, 1, 0);
+            if (Constants.ERR_OK != ret) {
+              Log.e(TAG, "startAudioMixing " + music + " failed " + engine.getErrorDescription(ret));
+            }
+            ret = engine.getAudioFileInfo(music);
+            if (Constants.ERR_OK != ret) {
+              Log.e(TAG, "getAudioFileInfo " + music + " failed " + engine.getErrorDescription(ret));
+            }
+          } else {
+            engine.resumeAudioMixing();
           }
           String danceMusic = getNewDanceDownPath();
           MetaBoltManager.instance().startMusicDance(danceMusic);
+        }
+        break;
+      }
+      case R.id.btn_music_beat: {
+        if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING == mAudioMixingState) {
+          btn_music_beat.setText(R.string.start_music_beat);
+          engine.pauseAudioMixing();
+          MetaBoltManager.instance().stopMusicBeat();
+        } else if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED == mAudioMixingState
+            || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED == mAudioMixingState
+            || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PAUSED == mAudioMixingState) {
+          btn_music_beat.setText(R.string.stop_music_beat);
+          if (0 == engine.getAudioMixingCurrentPosition()) {
+            String music = getMusicPath();
+            int ret = engine.startAudioMixing(music, false, false, 1, 0);
+            if (Constants.ERR_OK != ret) {
+              Log.e(TAG, "startAudioMixing " + music + " failed " + engine.getErrorDescription(ret));
+            }
+            ret = engine.getAudioFileInfo(music);
+            if (Constants.ERR_OK != ret) {
+              Log.e(TAG, "getAudioFileInfo " + music + " failed " + engine.getErrorDescription(ret));
+            }
+          } else {
+            engine.resumeAudioMixing();
+          }
+          String beatPath = getNewBeatDownPath();
+          MetaBoltManager.instance().startMusicBeat(beatPath);
         }
         break;
       }

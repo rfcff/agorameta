@@ -5,7 +5,9 @@
     <string name="join_channel">进频道</string>
     <string name="leave_channel">退频道</string>
     <string name="req_token">请求token</string>
-    <string name="play_music">播放音乐</string>
-    <string name="pause_music">暂停音乐</string>
+    <string name="start_music_dance">开启跳舞</string>
+    <string name="stop_music_dance">停止跳舞</string>
+    <string name="start_music_beat">开启节拍</string>
+    <string name="stop_music_beat">停止节拍</string>
     <string name="game_view_content_description">Game view</string>
 </resources>
