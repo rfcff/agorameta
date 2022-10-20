@@ -105,7 +105,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     mMetaBoltSrv.setLogCallback(this);
     int res = mMetaBoltSrv.initWithConfig(config);
     if (res != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-      Log.e(TAG, "init config failed, model path: " + mAIModelPath);
+      Log.e(TAG, "init config failed:" + res + ", model path:" + mAIModelPath);
       mMetaBoltSrv.removeMetaBoltObserver(this);
       mMetaBoltSrv.setLogCallback(null);
       mMetaBoltSrv = null;
