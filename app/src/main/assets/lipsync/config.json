@@ -1,0 +1,6 @@
+{
+  "models": {
+    "lipsync_bs": "lipsync_bs[1.0.1].vnmodel",
+    "lipsync_head": "lipsync_head[1.0.0].vnmodel"
+  }
+}
