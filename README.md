@@ -33,18 +33,18 @@ demo初始化界面如下图<br>
 ![image](https://user-images.githubusercontent.com/18079722/197968992-04d9495b-d085-417e-8ad0-a57465dd133b.png)<br>
 有四块区域，其中左上角（位置1）显示本地虚拟人画面、右上角（位置2）显示本地摄像头预览画面、左下角（位置3）为远端虚拟人画面、右下角（位置4）为远端视频画面。
 
-- 配置uid与channel
+- 配置uid与channel<br>
 输入uid以及agora获取token的channel id
 
-- 请求token
+- 请求token<br>
 点击请求token，获取JOYY Metabolt SDK token
 
-- 进频道
+- 进频道<br>
 点击进频道，待Metabolt SDK回调MTB_STATE_INIT_SUCCESS之后，可以看到位置1显示虚拟人画面，此时虚拟人显示头像模式MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HEAD，此时默认已经开启了表情随动。虚拟人口型会根据本地采集声音而变动，头像跟面部表情会跟随摄像头采集视频数据随动。
 
-- 开启/停止舞蹈
+- 开启/停止舞蹈<br>
 舞蹈跟节拍需要调整虚拟人显示全身模式MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_WHOLE，本地会播放音乐，可以看到本地虚拟人伴随音乐跳舞。再点击停止跳舞，虚拟人停止舞蹈。
 
-- 开始/停止节拍
+- 开始/停止节拍<br>
 开始节拍可以看到本地虚拟人伴随音乐挥舞手臂节拍，再点击停止跳舞，虚拟人停止挥舞节拍。
 
