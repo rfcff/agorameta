@@ -29,8 +29,8 @@ You are all set. Now connect your Android device and run the project.
 ```
 
 # agorameta演示
-demo初始化界面如下图
-![image](https://user-images.githubusercontent.com/18079722/197968992-04d9495b-d085-417e-8ad0-a57465dd133b.png)
+demo初始化界面如下图<br>
+![image](https://user-images.githubusercontent.com/18079722/197968992-04d9495b-d085-417e-8ad0-a57465dd133b.png)<br>
 有四块区域，其中左上角（位置1）显示本地虚拟人画面、右上角（位置2）显示本地摄像头预览画面、左下角（位置3）为远端虚拟人画面、右下角（位置4）为远端视频画面。
 
 - 配置uid与channel
