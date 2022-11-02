@@ -61,5 +61,6 @@ dependencies {
     api 'io.agora:player:1.3.0'
     api 'io.agora.rtc:full-screen-sharing:3.7.0'
     // metabolt library
-    implementation("com.metabolt.medialibrary:metabolt:1.0.0")
+    implementation "com.metabolt.medialibrary:metabolt:1.0.0"
+    implementation 'com.tencent.liteav:LiteAVSDK_TRTC:latest.release'
 }

@@ -67,9 +67,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private static final String TAG = "MainFragment";
   private MainViewModel mViewModel;
 
-  private final int PLAY_MUSIC_IDLE = 0;
-  private final int PLAY_MUSIC_PLAY = 1;
-  private final int PLAY_MUSIC_PAUSE = 2;
   private boolean audioMixing = false;
   private int mLocalAudioStreamId = 0;
   private int mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;

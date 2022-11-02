@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="agora_app_id" translatable="false">e730126bbdc0451fbb0598062fe8c3f5</string>
-    <string name="agora_access_token" translatable="false">007eJxTYChZ/yw3+PvytXvZ8rukXjVZTLdufysWEPZ9duG56ryiYC8FhlRzYwNDI7OkpJRkAxNTw7SkJANTSwsDM6O0VItk4zTTSyedkwOlXZM38hixMDJAIIjPxmBuYWlmasLAAADVnSAA</string>
+    <string name="agora_access_token" translatable="false">007eJxTYEhMNtBQnWx+ae+d7jfrLjld3n6Y8WpA+uXON8u7dPL/bpVXYEg1NzYwNDJLSkpJNjAxNUxLSjIwtbQwMDNKS7VINk4z5XuamNwQyMiQoebFysgAgSA+G4O5haWZqQkDAwD4Cx/x</string>
+    <string name="trtc_app_id" translatable="false">1400759077</string>
+    <string name="trtc_secret_key">aa3f792564c1cdba3dbe1553c864b3f21b64bd7c9114404f1cb2d6e16e8f9b0c</string>
 </resources>
