@@ -4,6 +4,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.lifecycle.ViewModelProvider;
 
 import android.content.Context;
+import android.graphics.ImageFormat;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -39,6 +40,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import io.agora.api.example.R;
 import io.agora.api.example.utils.CommonUtil;
 import io.agora.api.example.utils.DownloadUtil;
+import io.agora.api.example.utils.FaceSyncVideoFrame;
 import io.agora.api.example.utils.FileUtils;
 import io.agora.api.example.utils.IMetaBoltDataHandler;
 import io.agora.api.example.utils.IMetaFragmentHandler;
@@ -670,9 +672,52 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     engine.registerMediaMetadataObserver(metadataObserver, IMetadataObserver.VIDEO_METADATA);
   }
 
+//  private FaceSyncVideoFrame transferVideoFrame(int imageFormat,
+//                                                byte[] videoData,
+//                                                int videoWidth,
+//                                                int videoHeight,
+//                                                int cameraRotation) {
+//    //前置 cameraRotation = 270 mFaceSyncConfig.rotate = 90 不需要旋转
+//    //后置 cameraRotation = 90 mFaceSyncConfig.rotate = 270 不需要旋转
+//    if (mFaceSyncConfig.imageFormat == imageFormat && cameraRotationConvert(cameraRotation) == mFaceSyncConfig.rotate) {
+//      return new FaceSyncVideoFrame(imageFormat, videoData, videoWidth, videoHeight, mFaceSyncConfig.rotate,
+//          mFaceSyncConfig.mirror);
+//    }
+//
+//    //计算数据实际需要旋转角度
+//    int rotation = (cameraRotation + mFaceSyncConfig.rotate) % 360;
+//
+//    byte[] dstNV21Byte = new byte[videoData.length];
+//    if (mFaceSyncConfig.imageFormat == ImageFormat.NV21) {
+//      ImageUtil.nv21TransTo(videoData, videoWidth, videoHeight, rotation,
+//          false, dstNV21Byte); //数据强制不二次镜像处理 在view预览时候镜像测试即可
+//    } else if (mFaceSyncConfig.imageFormat == ImageFormat.UNKNOWN) {//由于系统ImageFormat没有NV12的格式定义 暂采用UNKNOWN代替
+//      ImageUtil.nv21TransToNV12(videoData, videoWidth, videoHeight,
+//          rotation, false, dstNV21Byte);
+//    }
+//
+//    int width = videoWidth;
+//    int height = videoHeight;
+//    if (rotation == 90 || rotation == 270) {
+//      width = videoHeight;
+//      height = videoWidth;
+//    }
+//    return new FaceSyncVideoFrame(mFaceSyncConfig.imageFormat, dstNV21Byte, width, height, mFaceSyncConfig.rotate,
+//        mFaceSyncConfig.mirror);
+//  }
+
   private final IVideoFrameObserver iVideoFrameObserver = new IVideoFrameObserver() {
     @Override
     public boolean onCaptureVideoFrame(VideoFrame videoFrame) {
+//      FaceSyncVideoFrame faceSyncVideoFrame = transferVideoFrame(videoFrame.getImageFormat(), videoFrame.getData(),
+//          videoFrame.getWidth(), videoFrame.getHeight(), cameraRotation);
+//      byte[] buffer = new byte[length];
+//      audioFrame.samples.get(buffer);
+//      mMetaBoltDataHandler.handleCaptureVideoFrame(videoFrame.width, videoFrame.height,
+//          audioFrame.samplesPerSec,
+//          audioFrame.channels,
+//          true);
+//      buffer = null;
       //mMetaBoltDataHandler.
 //      if (!isSnapshot) {
 //        return true;
@@ -855,7 +900,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
             MetaBoltManager.instance().setAnimation(UserConfig.kUid, getAnimationDownPath());
             MetaBoltManager.instance().startFaceEmotionByAudio();
-            //MetaBoltManager.instance().startFaceEmotionByCamera();
+            MetaBoltManager.instance().startFaceEmotionByCamera();
             //String beatDataPath = "/storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.bin";
             //MetaBoltManager.instance().startMusicBeat(getNewBeatDownPath());
             //String danceDataPath = "/storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat";
