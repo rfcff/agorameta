@@ -177,7 +177,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 
   public int startFaceEmotionByCamera() {
     Log.i(TAG, "startFaceEmotionByCamera");
-    return mMetaBoltSrv.getTrackEngine().startTrackFaceEmotion(MTBTrackEngine.MTTrackMode.MT_TRACK_MODE_VIDEO, this::onRecvTrackEmotionInfo);
+    return mMetaBoltSrv.getTrackEngine().startTrackFaceEmotion(MTBTrackEngine.MTTrackMode.MT_TRACK_MODE_CAMERA, this::onRecvTrackEmotionInfo);
   }
 
   public int stopFaceEmotion() {
@@ -584,17 +584,16 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
   }
 
   @Override
-  public void handleCaptureVideoFrame(int width, int height, byte[] data, int imageFormat, boolean isHorizontalFlip,
-                                      int rotation) {
-    if (mMetaBoltSrv != null &&
-        mMetaBoltSrv.getMetaBoltServiceState() == MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS) {
-      MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame(width, height,
-          MetaBoltTypes.MTBPixelFormat.MTB_PIXEL_FORMAT_NV21);
-      videoFrame.videoDataList.add(data);
-      videoFrame.videoDataStrideList.add(width);
-      videoFrame.videoDataStrideList.add(width);
-      mMetaBoltSrv.getTrackEngine().applyVideoData(videoFrame, isHorizontalFlip, rotation);
-    }
+  public void handleCaptureVideoFrame(int width, int height, byte[] data, int imageFormat, boolean isHorizontalFlip, int rotation) {
+//    if (mMetaBoltSrv != null &&
+//        mMetaBoltSrv.getMetaBoltServiceState() == MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS) {
+//      MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame(width, height,
+//          MetaBoltTypes.MTBPixelFormat.MTB_PIXEL_FORMAT_NV21);
+//      videoFrame.videoDataList.add(data);
+//      videoFrame.videoDataStrideList.add(width);
+//      videoFrame.videoDataStrideList.add(width);
+//      mMetaBoltSrv.getTrackEngine().applyVideoData(videoFrame, isHorizontalFlip, rotation);
+//    }
   }
 
   /**
