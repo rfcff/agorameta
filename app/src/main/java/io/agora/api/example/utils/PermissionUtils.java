@@ -34,6 +34,7 @@ public class PermissionUtils {
       ActivityCompat.requestPermissions(activity, reqPermissions, 2);
       // requestPermissions
       ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.RECORD_AUDIO}, 1);
+      ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.CAMERA}, 1);
       ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
       ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 1);
       ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.READ_PHONE_STATE}, 1);

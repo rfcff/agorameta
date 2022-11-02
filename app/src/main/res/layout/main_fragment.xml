@@ -5,7 +5,8 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".ui.main.MainFragment">
+    tools:context=".ui.main.MainFragment"
+    android:theme="@android:style/Theme.NoTitleBar.Fullscreen" >
 
     <LinearLayout
         android:id="@+id/ll_local_video"
