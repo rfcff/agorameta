@@ -248,6 +248,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         } else if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PAUSED == mAudioMixingState) {
+          MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_WHOLE);
           btn_music_dance.setText(R.string.stop_music_dance);
           String music = getMusicPath();
           if (0 == engine.getAudioMixingCurrentPosition()) {
@@ -275,6 +276,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         } else if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PAUSED == mAudioMixingState) {
+          MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_WHOLE);
           btn_music_beat.setText(R.string.stop_music_beat);
           if (0 == engine.getAudioMixingCurrentPosition()) {
             String music = getMusicPath();
@@ -848,7 +850,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
             MetaBoltManager.instance().createAvatarView(context, 0);
             MetaBoltManager.instance().createAvatarRole(getRoleModelPath(kRoleModelFemale), UserConfig.kUid);
             MetaBoltManager.instance().setRoleIndex(0, UserConfig.kUid);
-            MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_WHOLE);
+            MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF);
             // MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HEAD);
 
             MetaBoltManager.instance().setAnimation(UserConfig.kUid, getAnimationDownPath());
