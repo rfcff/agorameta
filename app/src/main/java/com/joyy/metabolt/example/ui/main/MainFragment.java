@@ -251,7 +251,13 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   public void onClick(View v) {
     switch(v.getId()) {
       case R.id.btn_init_rtc: {
-        initRTC();
+        if (mIsRtcInitialized) {
+          deinitRTC();
+          btn_init_rtc.setText(getString(R.string.init_rtc));
+        } else {
+          initRTC();
+          btn_init_rtc.setText(getString(R.string.deinit_rtc));
+        }
         break;
       }
       case R.id.btn_join: {
@@ -284,6 +290,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           mAgoraEngine.pauseAudioMixing();
           MetaBoltManager.instance().stopMusicDance();
           MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF);
+          MetaBoltManager.instance().setAvatarViewType(mRemoteUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF);
         } else if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PAUSED == mAudioMixingState) {
@@ -293,6 +300,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
             return;
           }
           MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_WHOLE);
+          MetaBoltManager.instance().setAvatarViewType(mRemoteUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_WHOLE);
           btn_music_dance.setText(R.string.stop_music_dance);
           if (0 == mAgoraEngine.getAudioMixingCurrentPosition()) {
             int ret = mAgoraEngine.startAudioMixing(musicPath, false, false, 1, 0);
@@ -321,6 +329,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           mAgoraEngine.pauseAudioMixing();
           MetaBoltManager.instance().stopMusicBeat();
           MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF);
+          MetaBoltManager.instance().setAvatarViewType(mRemoteUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF);
         } else if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PAUSED == mAudioMixingState) {
@@ -342,6 +351,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
             mAgoraEngine.resumeAudioMixing();
           }
           MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_WHOLE);
+          MetaBoltManager.instance().setAvatarViewType(mRemoteUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_WHOLE);
           btn_music_beat.setText(R.string.stop_music_beat);
 
           String beatPath = getNewBeatDownPath();
@@ -975,6 +985,36 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     }
     requestToken();
     mIsRtcInitialized = true;
+  }
+
+  void deinitRTC() {
+    mIsRtcInitialized = false;
+    switch (mMetaboltInitType) {
+      case METABOLT_INIT_TYPE_AGORA: {
+        if (mAgoraEngine != null) {
+          mAgoraEngine.leaveChannel();
+          mMainLooperHandler.post(RtcEngine::destroy);
+          mAgoraEngine = null;
+        }
+        break;
+      }
+      case METABOLT_INIT_TYPE_TRTC: {
+        if (mTRTCCloud != null) {
+          mTRTCCloud.stopLocalAudio();
+          mTRTCCloud.stopLocalPreview();
+          mTRTCCloud.exitRoom();
+          mTRTCCloud.setListener(null);
+          mTRTCCloud = null;
+          TRTCCloud.destroySharedInstance();
+        }
+        break;
+      }
+      case METABOLT_INIT_TYPE_THUNDERBOLT: {
+        break;
+      }
+      default:
+        break;
+    }
   }
 
   private void initMetaService() {

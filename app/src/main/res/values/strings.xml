@@ -5,6 +5,7 @@
     <string name="join_channel">进频道</string>
     <string name="leave_channel">退频道</string>
     <string name="init_rtc">初始化RTC</string>
+    <string name="deinit_rtc">卸载RTC</string>
     <string name="start_music_dance">开启跳舞</string>
     <string name="stop_music_dance">停止跳舞</string>
     <string name="start_music_beat">开启节拍</string>
