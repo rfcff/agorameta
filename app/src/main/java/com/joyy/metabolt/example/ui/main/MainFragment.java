@@ -39,10 +39,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import com.joyy.metabolt.example.R;
 import com.joyy.metabolt.example.utils.CommonUtil;
@@ -108,14 +105,20 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private View mRootView = null;
   private IMetaBoltDataHandler mMetaBoltDataHandler = null;
   private final String kLipSyncFileName = "lipsync";
+  private final String kFaceSyncFileName = "facesync";
   private final String kConfigJsonFileName = "/lipsync/config.json";
 
   private final String kRoleModelMale = "male_role";
   private final String kRoleModelFemale = "female_role";
 
-  private final String kDanceResourceUrl = "https://test-rtcapm.duowan.cn/apm-admin/video?fileName=new_dance.zip";
-  private final String kBeatAnimationResourceUrl = "https://test-rtcapm.duowan.cn/apm-admin/video?fileName=beat.zip";
-  private final String kRoleModelResourceUrl = "https://test-rtcapm.duowan.cn/apm-admin/video?fileName=model_pkg_android.zip";
+  private final String kZipType = ".zip";
+  private final String kServiceHttpsUrl = "https://test-rtcapm.duowan.cn/apm-admin/video?fileName=";
+
+  private final int kAudioPlayInterval = 40;
+
+  /**
+   * 资源默认路径
+   */
   private final static String kDanceMusicDir = "new_dance";
   private final static String kBeatAnimationDir = "beat";
   private final static String kRoleModelPkgDir = "model_pkg_android";
@@ -186,7 +189,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     mViewModel = new ViewModelProvider(this).get(MainViewModel.class);
     // TODO: Use the ViewModel
 
-    downResource();
+    downResource(false);
     copyResource();
     initMetaService();
   }
@@ -280,6 +283,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           btn_music_dance.setText(R.string.start_music_dance);
           mAgoraEngine.pauseAudioMixing();
           MetaBoltManager.instance().stopMusicDance();
+          MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF);
         } else if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PAUSED == mAudioMixingState) {
@@ -316,6 +320,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           btn_music_beat.setText(R.string.start_music_beat);
           mAgoraEngine.pauseAudioMixing();
           MetaBoltManager.instance().stopMusicBeat();
+          MetaBoltManager.instance().setAvatarViewType(UserConfig.kUid, MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF);
         } else if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PAUSED == mAudioMixingState) {
@@ -542,7 +547,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
     @Override
     public void onStreamMessage(int uid, int streamId, byte[] data) {
-      Log.i(TAG, "onStreamMessage uid:" + uid + ", streamId:" + streamId + ", data:" + data);
+      //Log.i(TAG, "onStreamMessage uid:" + uid + ", streamId:" + streamId + ", data:" + data);
       // 回调音频sei数据
       if (null != mMetaBoltDataHandler) {
         mMetaBoltDataHandler.handleRecvMediaExtraInfo(String.valueOf(uid), data, data.length);
@@ -751,19 +756,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     @Override
     public boolean onCaptureVideoFrame(VideoFrame videoFrame) {
       //mMetaBoltDataHandler.
-//      if (!isSnapshot) {
-//        return true;
-//      }
-//      byte[] rgb = new byte[videoFrame.yBuffer.remaining()];
-//      videoFrame.yBuffer.get(rgb, 0 , videoFrame.yBuffer.remaining());
-//      Bitmap bitmap = YUVUtils.bitmapFromRgba(videoFrame.width, videoFrame.height, rgb);
-//      Matrix matrix = new Matrix();
-//      matrix.setRotate(270);
-//      Bitmap newBitmap = Bitmap.createBitmap(bitmap, 0, 0, videoFrame.width, videoFrame.height, matrix, false);
-//      saveBitmap2Gallery(newBitmap);
-//
-//      bitmap.recycle();
-//      isSnapshot = false;
+//      byte[] nv21Data = CommonUtil.doI420ToNV21(videoFrame.yBuffer, videoFrame.uBuffer, videoFrame.vBuffer, videoFrame.width, videoFrame.height);
+//      mMetaBoltDataHandler.handleCaptureVideoFrame(videoFrame.width, videoFrame.height, nv21Data,
+//          MetaBoltTypes.MTBPixelFormat.MTB_PIXEL_FORMAT_NV21, false, videoFrame.rotation);
       return true;
     }
 
@@ -897,6 +892,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       public void onMetaBoltServiceStateChanged(int state) {
         mMetaServiceState = state;
         showInnerToast("Metabolt init state:" + state);
+        Log.d(TAG, "Metabolt init state:" + state);
         if (state == MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS) {
           mMainLooperHandler.post(() -> {
             Context context = getContext();
@@ -922,7 +918,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
               mIsRemoteVideoViewNeedShow = false;
               addRemoteVideoView(context);
             }
-            Log.d(TAG, "metabolt service init success");
           });
         }
       }
@@ -990,95 +985,54 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     mMetaBoltDataHandler = MetaBoltManager.instance();
   }
 
+  private void checkZipAllFiles(String checkUrl) {
+    if (mWaitDownloadUrlList.contains(checkUrl)) {
+      ++mWaitCount;
+    }
+
+    if (mWaitDownloadUrlList.size() == mWaitCount) {
+      new Thread(() -> {
+        Log.i(TAG, "start unzip all files...");
+        List<String> zipSuccessFileList = new ArrayList<>();
+        for (String url : mWaitDownloadUrlList) {
+          try {
+            String zipFileName = url.substring(url.lastIndexOf("/") + 1); // video?filename=xxx.zip
+            String downFilePath = DownloadUtil.get().getDownloadPath(Objects.requireNonNull(getContext())) + File.separator + zipFileName;
+            boolean zipRet = FileUtils.unZipUtil(downFilePath, DownloadUtil.get().getDownloadPath(Objects.requireNonNull(getContext())) + File.separator, true);
+            if (!zipRet) {
+              FileUtils.deleteDir(downFilePath);
+              showInnerToast("解压 " + zipFileName + " 失败, 需要去点重新下载!!!");
+            } else {
+              String zipResFileName = zipFileName.substring(zipFileName.lastIndexOf("=") + 1, zipFileName.lastIndexOf("."));
+              zipSuccessFileList.add(zipResFileName);
+            }
+          } catch (Exception e) {
+            Log.e(TAG, "onDownloadSuccess, failed: " + e);
+          }
+        };
+        mWaitDownloadUrlList.clear();
+      }).start();
+      mWaitCount = 0;
+    }
+  }
+
   /**
    * 资源相关 by Hsu
    */
   public void onDownloadSuccess(String url, String path, boolean isExist) {
     Log.i(TAG, "onDownloadSuccess url: " + url + ", path: " + path + ", isExist: " + isExist);
-    threadPoolExecutorService.execute(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          String downPath = DownloadUtil.get().getDownloadPath(getContext());
-          List<String> filterList = new ArrayList<>();
-          filterList.add("__MACOSX");
-          filterList.add("Store");
-          boolean zipRet = FileUtils.unZipUtil(path, downPath, true);
-          if (zipRet) {
-          } else {
-            FileUtils.deleteDir(path);
-            mMainLooperHandler.post(() -> {
-              showInnerToast("解压" + chooseFileByUrl(url) + "失败" + ",需要去点重新下载!!!");
-            });
-          }
-
-          String targetFile = chooseFileByUrl(url);
-          List<String> fileListWithoutTypeList = new CopyOnWriteArrayList<>();
-          List<String> datas = FileUtils.getFilesAllName(downPath + File.separator + targetFile);
-          if (datas != null && !datas.isEmpty()) {
-            for (String data : datas) {
-              if (!data.contains(".")) {
-                fileListWithoutTypeList.add(data);
-              }
-            }
-          }
-
-          int musicCnt = 0;
-          StringBuilder fileContent = new StringBuilder();
-          for (String fileNameStr : fileListWithoutTypeList) {
-            fileContent.append("{ ").append(musicCnt++).append(": ").append(fileNameStr).append(" }");
-          }
-          Log.i(TAG, "onDownloadSuccess run, url: " + url + ", path: " + path + ", data list: " + fileContent.toString());
-
-          if (!fileListWithoutTypeList.isEmpty()) {
-            mMainLooperHandler.post(() -> {
-              if (url.equals(kDanceResourceUrl)) {
-                updateDanceList(fileListWithoutTypeList);
-                updateBeatList(fileListWithoutTypeList);
-                updateMusicList(fileListWithoutTypeList);
-                updateMusicList(fileListWithoutTypeList);
-              } else if (url.equalsIgnoreCase(kBeatAnimationResourceUrl)) {
-                updateBeatAnimationList(fileListWithoutTypeList);
-              } else if (url.equalsIgnoreCase(kRoleModelResourceUrl)) {
-                updateRoleModelFile(fileListWithoutTypeList);
-                updateRoleModelList(fileListWithoutTypeList);
-              }
-              showInnerToast("解压成功,内容是:" + chooseFileByUrl(url));
-            });
-          }
-        } catch (Exception e) {
-          Log.e(TAG, "onDownloadSuccess, failed: " + e.toString());
-        }
-      }
-    });
-  }
-
-  private String chooseFileByUrl(String url) {
-    String targetFile = "";
-    if (url.equalsIgnoreCase(kDanceResourceUrl)) {
-      targetFile = kDanceMusicDir;
-    } else if (url.equalsIgnoreCase(kBeatAnimationResourceUrl)) {
-      targetFile = kBeatAnimationDir;
-    } else if (url.equalsIgnoreCase(kRoleModelResourceUrl)) {
-      targetFile = kRoleModelPkgDir;
-    }
-    return targetFile;
+    checkZipAllFiles(url);
   }
 
   @Override
   public void onDownloading(int progress) {
-//        Log.i(TAG, "onDownloading progress: " + progress);
   }
 
   @Override
   public void onDownloadFailed(String url) {
     Log.e(TAG, "onDownloadFailed url: " + url);
-    mMainLooperHandler.post(new Runnable() {
-      @Override
-      public void run() {
-        showInnerToast("下载资源出错,请检查网络");
-      }
-    });
+    checkZipAllFiles(url);
+    showInnerToast("下载资源 " + url.substring(url.lastIndexOf("/") + 1) + " 出错, 请检查网络");
   }
 
   private void filtrateFiles(List<String> fileList) {
@@ -1088,7 +1042,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           file.contentEquals("json") ||
           file.contentEquals("manifest") ||
           file.contentEquals("clothes") ||
-          file.contentEquals("listeningtomusic")) {
+          file.contentEquals("listeningtomusic"))
+      {
         removeList.add(file);
       }
     }
@@ -1161,7 +1116,10 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     //String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath();
     String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
     if (mMusicFileList.size() > 1) {
-      String music = mMusicFileList.get(1);
+      String music = mMusicFileList.get(0);
+      if (music.contains("k-pop")) {
+        music = mMusicFileList.get(1);
+      }
       return targetDir + "/download/new_dance/" + music + "/" + music + ".bin";
     }
     return "";
@@ -1172,7 +1130,10 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     // /storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat
     String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
     if (mMusicFileList.size() > 1) {
-      String music = mMusicFileList.get(1);
+      String music = mMusicFileList.get(0);
+      if (music.contains("k-pop")) {
+        music = mMusicFileList.get(1);
+      }
       return targetDir + "/download/new_dance/" + music + "/" + music + ".dat";
     }
     return "";
@@ -1206,31 +1167,35 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/qinghuaci/qinghuaci.mp3
     String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
     if (mMusicFileList.size() > 1) {
-      String music = mMusicFileList.get(1);
+      String music = mMusicFileList.get(0);
+      if (music.contains("k-pop")) {
+        music = mMusicFileList.get(1);
+      }
       return targetDir + "/download/new_dance/" + music + "/" + music + ".mp3";
     }
     return "";
   }
 
   private ExecutorService threadPoolExecutorService = null;
-  private final List<String> mDownloadSuccessList = new ArrayList<>();
-  private void downResource() {
-    if (null == threadPoolExecutorService) {
-      threadPoolExecutorService = new ThreadPoolExecutor(1, Runtime.getRuntime().availableProcessors(),
-          0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
-    }
-
+  private int mWaitCount = 0;
+  private final List<String> mWaitDownloadUrlList = new CopyOnWriteArrayList<>();
+  private void downResource(boolean isForce) {
     List<String> downFileList = new ArrayList<>();
-    downFileList.add(kBeatAnimationResourceUrl);
-    downFileList.add(kDanceResourceUrl);
-    downFileList.add(kRoleModelResourceUrl);
+    downFileList.add(kDanceMusicDir);
+    downFileList.add(kBeatAnimationDir);
+    downFileList.add(kRoleModelPkgDir);
 
-    synchronized (mDownloadSuccessList) {
-      for (String downSuccess : mDownloadSuccessList) {
-        downFileList.remove(downSuccess);
+    List<String> existFileList = new ArrayList<>();
+    for (String fileName : downFileList) {
+      List<String> getFiles = FileUtils.getFilesAllName(DownloadUtil.get().getDownloadPath(Objects.requireNonNull(getContext())) + File.separator + fileName);
+      if (!isForce && getFiles != null && !getFiles.isEmpty()) {
+        existFileList.add(fileName);
+      } else {
+        mWaitDownloadUrlList.add(kServiceHttpsUrl + fileName + kZipType);
       }
     }
-    for (String url : downFileList) {
+
+    for (String url : mWaitDownloadUrlList) {
       DownloadUtil.get().download(getContext(), url, this);
     }
   }
@@ -1239,6 +1204,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     String path = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath();
     String targetDir = path + File.separator;
     copyFilesFromAssets(kLipSyncFileName, targetDir + kLipSyncFileName);
+    //共用kLipSyncFileName目录和config.json
+    copyFilesFromAssets(kFaceSyncFileName, targetDir + kLipSyncFileName);
   }
 
   private void copyFilesFromAssets(String assetsPath, String savePath) {
@@ -1297,6 +1264,11 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     } else {
       Log.i(TAG, "[copyFileFromAssets] file is exist: " + filename);
     }
+  }
+
+  @Override
+  public void onMetaBoltState(int state) {
+
   }
 
   @Override

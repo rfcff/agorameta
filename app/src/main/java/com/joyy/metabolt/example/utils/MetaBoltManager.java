@@ -31,10 +31,7 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
-
 import com.joyy.metabolt.example.R;
 import io.agora.rtc.Constants;
 
@@ -112,6 +109,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
       return res;
     }
     Log.i(TAG, "metaBolt sdk version: " + mMetaBoltSrv.getMetaBoltVersion() + ", model path: " + mAIModelPath);
+    initHandleSend();
     startHandler();
     return res;
   }
@@ -120,6 +118,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     if (!isInit()) {
       return -1;
     }
+    deInitHandleSend();
     stopHandler();
     for (Map.Entry<Integer, MTBAvatarView> viewEntry : mAvatarViewMap.entrySet()) {
       LinearLayout linearLayout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(viewEntry.getKey()));
@@ -135,9 +134,6 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     mAvatarRoleMap.clear();
     mAvatarViewMap.clear();
 
-    mEmotionDataBufferList.clear();
-    mBeatDataBufferList.clear();
-    mDanceDataBufferList.clear();
 
     int res = mMetaBoltSrv.unInit();
     if (res != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
@@ -175,16 +171,17 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     return mMetaBoltSrv.getTrackEngine().startTrackFaceEmotion(MTBTrackEngine.MTTrackMode.MT_TRACK_MODE_AUDIO, this::onRecvTrackEmotionInfo);
   }
 
+  private boolean mIsOpenVideoEmotion = false;
   public int startFaceEmotionByCamera() {
     Log.i(TAG, "startFaceEmotionByCamera");
-    return mMetaBoltSrv.getTrackEngine().startTrackFaceEmotion(MTBTrackEngine.MTTrackMode.MT_TRACK_MODE_CAMERA, this::onRecvTrackEmotionInfo);
+    mIsOpenVideoEmotion = true;
+    return mMetaBoltSrv.getTrackEngine().startTrackFaceEmotion(MTBTrackEngine.MTTrackMode.MT_TRACK_MODE_VIDEO, this::onRecvTrackEmotionInfo);
   }
 
   public int stopFaceEmotion() {
     Log.i(TAG, "stopFaceEmotion");
-    mEmotionDataBufferList.clear();
     int ret = mMetaBoltSrv.getTrackEngine().stopTrackFaceEmotion();
-    // TODO: video handler
+    mIsOpenVideoEmotion = false;
     mIsOpenAudioEmotion = false;
     handleSendMediaExtraInfo();
     return ret;
@@ -200,7 +197,6 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 
   public int stopMusicDance() {
     Log.i(TAG, "stopMusicDance");
-    mDanceDataBufferList.clear();
     if (null == mMetaBoltSrv) return -1;
     int ret = mMetaBoltSrv.getTrackEngine().stopTrackMusicDance();
     mIsOpenDance = false;
@@ -217,7 +213,6 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 
   public int stopMusicBeat() {
     Log.i(TAG, "stopMusicBeat");
-    mBeatDataBufferList.clear();
     int ret = mMetaBoltSrv.getTrackEngine().stopTrackMusicBeat();
     mIsOpenBeat = false;
     handleSendMediaExtraInfo();
@@ -365,14 +360,6 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     return -1;
   }
 
-  public int refresh(int index) {
-    MTBAvatarView view = mAvatarViewMap.get(index);
-    if (view != null) {
-      view.refresh();
-    }
-    return 0;
-  }
-
   public boolean isRoleExist(String uid) {
     return mAvatarRoleMap.get(uid) != null;
   }
@@ -402,7 +389,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     if (Constants.LOCAL_AUDIO_STREAM_STATE_STOPPED == status || Constants.LOCAL_AUDIO_STREAM_STATE_FAILED == status) {
       if (isInit()) {
         MTBAvatarRole myRole = mAvatarRoleMap.get(UserConfig.kUid);
-        if (myRole != null && mIsOpenAudioEmotion) {
+        if (myRole != null && (mIsOpenAudioEmotion || mIsOpenVideoEmotion)) {
           myRole.resetFaceEmotion();
         }
       }
@@ -416,8 +403,6 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 
   @Override
   public void onLeaveRoom() {
-    mRevMediaSEIMap.clear();
-    mSendMediaSEIMap.clear();
   }
 
   @Override
@@ -439,14 +424,14 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
       mMtbMgrCallback.onRemoteAudioStopped(uid, stop);
     }
 
-//        if (stop) {
-//            MTBAvatarRole role = mAvatarRoleMap.get(uid);
-//            if (role != null) {
-//                role.resetFaceEmotion();
-//                role.resetMusicBeat();
-//                role.resetMusicDance();
-//            }
-//        }
+    if (stop) {
+      MTBAvatarRole role = mAvatarRoleMap.get(uid);
+      if (role != null) {
+        role.resetFaceEmotion();
+        role.resetMusicBeat();
+        role.resetMusicDance();
+      }
+    }
   }
 
   /**
@@ -465,6 +450,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     super.onMetaBoltServiceStateChanged(state);
     if (mMetaFragmentHandler.get() != null) {
       mMetaFragmentHandler.get().onStateMsgCallback("onMetaBoltServiceStateChanged :" + state);
+      mMetaFragmentHandler.get().onMetaBoltState(state);
     }
 
     if (mMtbMgrCallback != null) {
@@ -494,9 +480,10 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     }
   }
 
-  private final Queue<byte[]> mEmotionDataBufferList = new ConcurrentLinkedDeque<>();
-  private final Queue<byte[]> mBeatDataBufferList = new ConcurrentLinkedDeque<>();
-  private final Queue<byte[]> mDanceDataBufferList = new ConcurrentLinkedDeque<>();
+  private final Object mDataLock = new Object();
+  private MTBFaceEmotion mFaceEmotion = null;
+  private MTBMusicBeatInfo mBeatInfo = null;
+  private MTBMusicDanceInfo mDanceInfo = null;
 
   @Override
   public int onRecvTrackEmotionInfo(MTBFaceEmotion info) {
@@ -504,8 +491,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     if (role != null) {
       role.setFaceEmotion(info);
     }
-    mEmotionDataBufferList.clear();
-    mEmotionDataBufferList.add(info.serializeToBin());
+    synchronized (mDataLock) {
+      mFaceEmotion = info;
+    }
     return 0;
   }
 
@@ -515,7 +503,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     if (role != null) {
       role.setMusicBeat(info);
     }
-    mBeatDataBufferList.add(info.serializeToBin());
+    synchronized (mDataLock) {
+      mBeatInfo = info;
+    }
     return 0;
   }
 
@@ -525,11 +515,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     if (role != null) {
       role.setMusicDance(info);
     }
-    if (mDanceDataBufferList.size() > 3) {
-      Log.i(TAG, "remain too much dance info");
-      mDanceDataBufferList.remove();
+    synchronized (mDataLock) {
+      mDanceInfo = info;
     }
-    mDanceDataBufferList.add(info.serializeToBin());
     return 0;
   }
 
@@ -583,6 +571,75 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     }
   }
 
+  byte[] nv21AlignBytes;
+  private void nv21BytesAlignTest(byte[] nv21Bytes, int width, int height, boolean isHorizontalFlip, int rotation) {
+    int size = (width + 16) * height * 3 / 2;
+    if (nv21AlignBytes == null || nv21AlignBytes.length != size) {
+      nv21AlignBytes = new byte[size];
+    }
+    for (int i = 0; i < height / 2; i++) {
+      System.arraycopy(nv21Bytes, i * width, nv21AlignBytes, i * (width + 16), width);
+      System.arraycopy(nv21Bytes, width * height + i * width, nv21AlignBytes, (width + 16) * height + i * (width + 16), width);
+    }
+    for (int i = height / 2; i < height; i++) {
+      System.arraycopy(nv21Bytes, i * width, nv21AlignBytes, i * (width + 16), width);
+    }
+    MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame(width, height,
+        MetaBoltTypes.MTBPixelFormat.MTB_PIXEL_FORMAT_NV21);
+    videoFrame.videoDataList.add(nv21AlignBytes);
+    videoFrame.videoDataStrideList.add(width + 16);
+    videoFrame.videoDataStrideList.add(width + 16);
+    mMetaBoltSrv.getTrackEngine().applyVideoData(videoFrame, isHorizontalFlip, rotation);
+  }
+
+  byte[] nv21YBytes;
+  byte[] nv21VUBytes;
+  private void nv21BytesPlanesTest(byte[] nv21Bytes, int width, int height, boolean isHorizontalFlip, int rotation) {
+    int yStride = width;
+    int vuStride = width;
+    int ySize = yStride * height;
+    int vuSize = vuStride * height / 2;
+    if (nv21YBytes == null || nv21YBytes.length != ySize) {
+      nv21YBytes = new byte[ySize];
+    }
+    if (nv21VUBytes == null || nv21VUBytes.length != vuSize) {
+      nv21VUBytes = new byte[vuSize];
+    }
+    for (int i = 0; i < height; i++) {
+      System.arraycopy(nv21Bytes, i * width, nv21YBytes, i * yStride, width);
+    }
+    for (int i = 0; i < height / 2; i++) {
+      System.arraycopy(nv21Bytes, width * height + i * width, nv21VUBytes,  i * vuStride, width);
+    }
+    MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame(width, height,
+        MetaBoltTypes.MTBPixelFormat.MTB_PIXEL_FORMAT_NV21);
+    videoFrame.videoDataList.add(nv21YBytes);
+    videoFrame.videoDataList.add(nv21VUBytes);
+    videoFrame.videoDataStrideList.add(yStride);
+    videoFrame.videoDataStrideList.add(vuStride);
+    mMetaBoltSrv.getTrackEngine().applyVideoData(videoFrame, isHorizontalFlip, rotation);
+  }
+
+  @Override
+  public void handleCaptureVideoFrame(int width, int height, byte[] data, int imageFormat, boolean isHorizontalFlip,
+                                      int rotation) {
+    if (mMetaBoltSrv != null &&
+        mMetaBoltSrv.getMetaBoltServiceState() == MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS) {
+
+      MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame(width, height,
+          MetaBoltTypes.MTBPixelFormat.MTB_PIXEL_FORMAT_NV21);
+      videoFrame.videoDataList.add(data);
+      videoFrame.videoDataStrideList.add(width);
+      videoFrame.videoDataStrideList.add(width);
+      mMetaBoltSrv.getTrackEngine().applyVideoData(videoFrame, isHorizontalFlip, rotation);
+
+//            //nv21数据对齐输入测试
+//            nv21BytesAlignTest(data, width, height, isHorizontalFlip, rotation);
+//            //nv21数据多plane输入测试
+//            nv21BytesPlanesTest(data, width, height, isHorizontalFlip, rotation);
+    }
+  }
+
   /**
    *  SEI format: |lipsync|type(1)|len(2)|data(n)||type(1)|len(2)|data(n)||type(1)|len(2)|data(n)|
    *  1. >1 字节表示数值的字段使用大端序
@@ -592,8 +649,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
    *  type: 2  dance
    *  type: 3  beat
    */
-  private final static String kLipsyncFlag = "lipsync";
-  public final static int kSEIStartLen = kLipsyncFlag.getBytes().length;
+  public final static String kLipsyncFlagString = "lipsync";
+  private final static byte[] kLipsyncFlagByteBuffer = kLipsyncFlagString.getBytes();
+  public final static int kSEIStartLen = kLipsyncFlagByteBuffer.length;
 
   public final static int kBlendShapeType = 1;
   public final static int kDanceType      = 2;
@@ -612,88 +670,114 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 
   private long mLastSendSEITimestamp = 0;
   private final Map<Integer, Integer> mSendMediaSEIMap = new ConcurrentHashMap<>();
+  private void initHandleSend() {
+    mSendMediaSEIMap.put(kBlendShapeType, 0);
+    mSendMediaSEIMap.put(kDanceType, 0);
+    mSendMediaSEIMap.put(kBeatType, 0);
+  }
+
+  private void deInitHandleSend() {
+    mSendMediaSEIMap.clear();
+    mSendMediaExtraInfoBuffer.clear();
+  }
+
+  private final int kThunderMaxLengthOfSEI = 500; // 500 is max SEI length of audio opus dse
+  private final ByteBuffer mSendMediaExtraInfoBuffer = ByteBuffer.allocate(kThunderMaxLengthOfSEI);
   public void handleSendMediaExtraInfo() {
-    if ((mIsOpenAudioEmotion || mIsOpenDance || mIsOpenBeat) &&
-        mAudioPublishStatus == Constants.PUB_STATE_PUBLISHED) {
-
-      if (mEmotionDataBufferList.isEmpty() && mDanceDataBufferList.isEmpty() && mBeatDataBufferList.isEmpty()) {
-        return;
-      }
-
-      if (mSendMediaSEIMap.isEmpty()) {
-        mSendMediaSEIMap.put(kBlendShapeType, 0);
-        mSendMediaSEIMap.put(kDanceType, 0);
-        mSendMediaSEIMap.put(kBeatType, 0);
-        mLastSendSEITimestamp = System.currentTimeMillis();
-      }
-
-      int bufferLen = kSEIStartLen;
-      int typeLen = 3;
-
-      byte[] emotionData = mEmotionDataBufferList.poll();
-      if (emotionData != null) {
-        bufferLen += emotionData.length + typeLen;
-      }
-
-      byte[] danceData = mDanceDataBufferList.poll();
-      if (danceData != null) {
-        bufferLen += danceData.length + typeLen;
-      }
-
-      byte[] beatData = mBeatDataBufferList.poll();
-      if (beatData != null) {
-        bufferLen += beatData.length + typeLen;
-      }
-
-      ByteBuffer byteBuffer = ByteBuffer.allocate(bufferLen);
-      byteBuffer.put(kLipsyncFlag.getBytes());
-
-      int type = -1;
-      if (emotionData != null) {
-        type = kBlendShapeType;
-        byteBuffer.put((byte) type);
-        byteBuffer.put(ByteUtil.integerToTwoBytes(emotionData.length));
-        byteBuffer.put(emotionData);
-        mSendMediaSEIMap.put(type, mSendMediaSEIMap.get(type) + 1);
-      }
-
-      if (danceData != null) {
-        type = kDanceType;
-        byteBuffer.put((byte) type);
-        byteBuffer.put(ByteUtil.integerToTwoBytes(danceData.length));
-        byteBuffer.put(danceData);
-        mSendMediaSEIMap.put(type, mSendMediaSEIMap.get(type) + 1);
-      }
-
-      if (beatData != null) {
-        type = kBeatType;
-        byteBuffer.put((byte) type);
-        byteBuffer.put(ByteUtil.integerToTwoBytes(beatData.length));
-        byteBuffer.put(beatData);
-        mSendMediaSEIMap.put(type, mSendMediaSEIMap.get(type) + 1);
-      }
-
-      int sendBufferLen = byteBuffer.array().length;
-      if (sendBufferLen > kSEIStartLen) {
-        int ret = mMetaFragmentHandler.get().onAudioSEIData(byteBuffer);
-        if (ret != 0 || sendBufferLen > 500) { // 500 is max SEI length of audio opus dse
-          Log.e(TAG, "send SEI failed, ret: " + ret + ", length: " + sendBufferLen);
+    if (mAudioPublishStatus == Constants.PUB_STATE_PUBLISHED) {
+      if ((mIsOpenVideoEmotion || mIsOpenAudioEmotion || mIsOpenDance || mIsOpenBeat)) {
+        synchronized (mDataLock) {
+          if (mFaceEmotion == null && mDanceInfo == null && mBeatInfo == null) {
+            return;
+          }
         }
 
-        long currentTimestamp = System.currentTimeMillis();
-        if ((currentTimestamp - mLastSendSEITimestamp) > 1000) {
-          mLastSendSEITimestamp = currentTimestamp;
-          StringBuilder stringBuilder = new StringBuilder();
-          stringBuilder.append("handleSendMediaExtraInfo ");
-          for (Map.Entry<Integer, Integer> entry : mSendMediaSEIMap.entrySet()) {
-            stringBuilder.append(" { type: ");
-            stringBuilder.append(switchTypeToString(entry.getKey()));
-            stringBuilder.append(", count: ");
-            stringBuilder.append(entry.getValue());
-            stringBuilder.append(" } ");
-            mSendMediaSEIMap.put(entry.getKey(), 0);
+        int bufferLen = kSEIStartLen;
+        int typeLen = 3;
+
+        byte[] emotionData = null;
+        byte[] danceData = null;
+        byte[] beatData = null;
+        synchronized (mDataLock) {
+          if (mFaceEmotion != null) {
+            emotionData = mFaceEmotion.serializeToBin();
+            bufferLen += emotionData.length + typeLen;
+            mFaceEmotion = null;
           }
-          Log.i(TAG, stringBuilder.toString());
+
+          if (mDanceInfo != null) {
+            danceData = mDanceInfo.serializeToBin();
+            bufferLen += danceData.length + typeLen;
+            mDanceInfo = null;
+          }
+
+          if (mBeatInfo != null) {
+            beatData = mBeatInfo.serializeToBin();
+            bufferLen += beatData.length + typeLen;
+            mBeatInfo = null;
+          }
+        }
+
+        if (bufferLen > kThunderMaxLengthOfSEI) {
+          Log.e(TAG, "handleSendMediaExtraInfo send SEI failed, buffer len: " + bufferLen + ", is supper than max len: " + kThunderMaxLengthOfSEI);
+          return;
+        }
+
+        mSendMediaExtraInfoBuffer.clear();
+        mSendMediaExtraInfoBuffer.limit(bufferLen);
+        mSendMediaExtraInfoBuffer.put(kLipsyncFlagByteBuffer);
+
+        int type = -1;
+        if (emotionData != null) {
+          type = kBlendShapeType;
+          mSendMediaExtraInfoBuffer.put((byte) type);
+          mSendMediaExtraInfoBuffer.put(ByteUtil.integerToTwoBytes(emotionData.length));
+          mSendMediaExtraInfoBuffer.put(emotionData);
+          mSendMediaSEIMap.put(type, mSendMediaSEIMap.get(type) + 1);
+        }
+
+        if (danceData != null) {
+          type = kDanceType;
+          mSendMediaExtraInfoBuffer.put((byte) type);
+          mSendMediaExtraInfoBuffer.put(ByteUtil.integerToTwoBytes(danceData.length));
+          mSendMediaExtraInfoBuffer.put(danceData);
+          mSendMediaSEIMap.put(type, mSendMediaSEIMap.get(type) + 1);
+        }
+
+        if (beatData != null) {
+          type = kBeatType;
+          mSendMediaExtraInfoBuffer.put((byte) type);
+          mSendMediaExtraInfoBuffer.put(ByteUtil.integerToTwoBytes(beatData.length));
+          mSendMediaExtraInfoBuffer.put(beatData);
+          mSendMediaSEIMap.put(type, mSendMediaSEIMap.get(type) + 1);
+        }
+
+        int sendBufferLen = mSendMediaExtraInfoBuffer.limit();
+        if (sendBufferLen > kSEIStartLen) {
+          int ret = mMetaFragmentHandler.get().onAudioSEIData(mSendMediaExtraInfoBuffer);
+          if (ret != 0 || sendBufferLen > kThunderMaxLengthOfSEI) {
+            Log.e(TAG, "send SEI failed, ret: " + ret + ", length: " + sendBufferLen);
+          } else {
+            long currentTimestamp = System.currentTimeMillis();
+            if (mLastSendSEITimestamp == 0) {
+              mLastSendSEITimestamp = currentTimestamp;
+            } else {
+              if ((currentTimestamp - mLastSendSEITimestamp) > 1000) {
+                mLastSendSEITimestamp = currentTimestamp;
+                StringBuilder stringBuilder = new StringBuilder();
+                stringBuilder.append("handleSendMediaExtraInfo ");
+                for (Map.Entry<Integer, Integer> entry : mSendMediaSEIMap.entrySet()) {
+                  stringBuilder.append(" { type: ");
+                  stringBuilder.append(switchTypeToString(entry.getKey()));
+                  stringBuilder.append(", count: ");
+                  stringBuilder.append(entry.getValue());
+                  stringBuilder.append(" } ");
+                  mSendMediaSEIMap.put(entry.getKey(), 0);
+                }
+                Log.i(TAG, stringBuilder.toString());
+              }
+            }
+          }
         }
       }
     }
@@ -713,10 +797,10 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
       mRevMediaSEIMap.put(uid, revMediaInfoPair);
     }
 
-    if (mMetaBoltSrv != null) {
+    if (isInit()) {
       byte[] startData = ByteUtil.subByte(data, 0, kSEIStartLen);
       String startStr = new String(startData, StandardCharsets.UTF_8);
-      if (!startStr.equalsIgnoreCase(kLipsyncFlag)) {
+      if (!startStr.equalsIgnoreCase(kLipsyncFlagString)) {
         Log.e(TAG, "sei is not begin with lipsync");
         return;
       }
@@ -744,6 +828,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
           beatData = parseData;
         } else {
           Log.e(TAG, "handleRecvMediaExtraInfo, uid: " + uid + ", data format is error: " + Base64.encodeToString(data, Base64.NO_WRAP));
+          return;
         }
         remnantLen = remnantLen - typeLine - parseDataLen;
         offsetLen = offsetLen + parseDataLen;
@@ -751,42 +836,36 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
       }
 
       if (emotionData != null || beatData != null || danceData != null) {
-        if (emotionData != null) {
-          MTBFaceEmotion emotion = new MTBFaceEmotion();
-          int ret = emotion.unserializeFromBin(emotionData);
-          if (ret == MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-            MTBAvatarRole role = mAvatarRoleMap.get(uid);
-            if (role != null) {
+        MTBAvatarRole role = mAvatarRoleMap.get(uid);
+        if (role != null) {
+          if (emotionData != null) {
+            MTBFaceEmotion emotion = new MTBFaceEmotion();
+            int ret = emotion.unserializeFromBin(emotionData);
+            if (ret == MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
               role.setFaceEmotion(emotion);
+            } else {
+              Log.e(TAG, "emotion info unserialize from bin failed, data: " + Base64.encodeToString(emotionData, Base64.NO_WRAP));
             }
-          } else {
-            Log.e(TAG, "emotion info unserialize from bin failed, data: " + Base64.encodeToString(emotionData, Base64.NO_WRAP));
           }
-        }
 
-        if (danceData != null) {
-          MTBMusicDanceInfo danceInfo = new MTBMusicDanceInfo();
-          int ret = danceInfo.unserializeFromBin(danceData);
-          if (ret == MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-            MTBAvatarRole role = mAvatarRoleMap.get(uid);
-            if (role != null) {
+          if (danceData != null) {
+            MTBMusicDanceInfo danceInfo = new MTBMusicDanceInfo();
+            int ret = danceInfo.unserializeFromBin(danceData);
+            if (ret == MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
               role.setMusicDance(danceInfo);
+            } else {
+              Log.e(TAG, " dance info unserialize from bin failed, data: " + Base64.encodeToString(danceData, Base64.NO_WRAP));
             }
-          } else {
-            Log.e(TAG, " dance info unserialize from bin failed, data: " + Base64.encodeToString(danceData, Base64.NO_WRAP));
           }
-        }
 
-        if (beatData != null) {
-          MTBMusicBeatInfo beatInfo = new MTBMusicBeatInfo();
-          int ret = beatInfo.unserializeFromBin(beatData);
-          if (ret == MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
-            MTBAvatarRole role = mAvatarRoleMap.get(uid);
-            if (role != null) {
+          if (beatData != null) {
+            MTBMusicBeatInfo beatInfo = new MTBMusicBeatInfo();
+            int ret = beatInfo.unserializeFromBin(beatData);
+            if (ret == MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
               role.setMusicBeat(beatInfo);
+            } else {
+              Log.e(TAG, " beat info unserialize from bin failed, data: " + Base64.encodeToString(beatData, Base64.NO_WRAP));
             }
-          } else {
-            Log.e(TAG, " beat info unserialize from bin failed, data: " + Base64.encodeToString(beatData, Base64.NO_WRAP));
           }
         }
 
@@ -815,45 +894,45 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     }
   }
 
-  /**
-   *  UI
-   */
-  private int getAvatarContainerViewIdByIndex(int index) {
-    switch (index) {
-      case 0:
-        return R.id.fl_local_meta;
-      default:
-        return R.id.fl_remote_meta;
+    /**
+     *  UI
+     */
+    private int getAvatarContainerViewIdByIndex(int index) {
+      switch (index) {
+        case 0:
+          return R.id.fl_local_meta;
+        default:
+          return R.id.fl_remote_meta;
+      }
     }
-  }
 
-  private int getAvatarViewColorIdByIndex(int index) {
-    if (index == 0) {
-      return Color.BLUE;
-    } else if (index == 1) {
-      return Color.RED;
-    } else if (index == 2) {
-      return Color.GRAY;
-    } else if (index == 3) {
-      return Color.GREEN;
-    } else if (index == 4) {
-      return Color.BLACK;
-    } else if (index == 5) {
-      return Color.YELLOW;
+    private int getAvatarViewColorIdByIndex(int index) {
+      if (index == 0) {
+        return Color.BLUE;
+      } else if (index == 1) {
+        return Color.RED;
+      } else if (index == 2) {
+        return Color.GRAY;
+      } else if (index == 3) {
+        return Color.GREEN;
+      } else if (index == 4) {
+        return Color.BLACK;
+      } else if (index == 5) {
+        return Color.YELLOW;
+      }
+      return Color.LTGRAY;
     }
-    return Color.LTGRAY;
-  }
 
-  boolean mIsFullScreenNow = false;
-  private void controlOtherView(boolean hide) {
+    boolean mIsFullScreenNow = false;
+    private void controlOtherView(boolean hide) {
 //    int value = hide ? View.GONE : View.VISIBLE;
 //    mRootView.get().findViewById(R.id.meta_view_rect).setVisibility(value);
 //    mRootView.get().findViewById(R.id.meta_tab_host_test).setVisibility(value);
 //    mRootView.get().findViewById(R.id.meta_tab_host_test2).setVisibility(value);
-  }
+    }
 
-  @Override
-  public void onClick(View view) {
+    @Override
+    public void onClick(View view) {
 //    Log.i(TAG, "onClick, is full view now: " + mIsFullScreenNow + ", view object: " + view);
 //    LinearLayout fullLayout = mRootView.get().findViewById(R.id.metabolt_full_view_container);
 //    if (fullLayout == null) {
@@ -915,9 +994,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 //      Log.e(TAG, e.getMessage());
 //      onClick(view);
 //    }
-  }
+    }
 
-  public void onHiddenChanged(boolean hidden) {
+    public void onHiddenChanged(boolean hidden) {
 //    if (mIsFullScreenNow) {
 //      LinearLayout fullLayout = mRootView.get().findViewById(R.id.metabolt_full_view_container);
 //      if (hidden) {
@@ -937,9 +1016,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 //        }
 //      }
 //    }
-  }
+    }
 
-  public void resumeView() {
+    public void resumeView() {
 //    if (mIsFullScreenNow) {
 //      controlOtherView(true);
 //      LinearLayout fullLayout = mRootView.get().findViewById(R.id.metabolt_full_view_container);
@@ -952,5 +1031,5 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 //        view.refresh();
 //      }
 //    }
+    }
   }
-}

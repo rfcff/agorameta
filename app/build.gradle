@@ -12,7 +12,17 @@ android {
         targetSdkVersion 29
         versionCode 1
         versionName "1.0"
+        multiDexEnabled true
         ndkVersion "21.3.6528147"
+
+        splits {
+            abi {
+                enable true
+                reset()
+                include "armeabi-v7a", "arm64-v8a", "x86"
+                universalApk true
+            }
+        }
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -26,6 +36,12 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    packagingOptions {
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
     }
 }
 
@@ -61,6 +77,8 @@ dependencies {
     api 'io.agora:player:1.3.0'
     api 'io.agora.rtc:full-screen-sharing:3.7.0'
     // metabolt library
-    implementation "com.metabolt.medialibrary:metabolt:1.0.0"
+    implementation "com.rtc.metabolt:metabolt-all:1.1.0-129-SNAPSHOT"
+    //implementation "com.metabolt.medialibrary:metabolt:1.0.0"
+    implementation "com.rtc.thunder:thunderbolt-fullvideo:3.8.0-5663-SNAPSHOT"
     implementation 'com.tencent.liteav:LiteAVSDK_TRTC:latest.release'
 }
