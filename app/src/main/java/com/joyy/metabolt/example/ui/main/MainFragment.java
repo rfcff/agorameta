@@ -72,7 +72,6 @@ import io.agora.rtc.video.VideoEncoderConfiguration;
 
 public class MainFragment extends Fragment implements View.OnClickListener,
     TokenUtils.OnTokenListener,
-    DownloadUtil.OnDownloadListener,
     IMetaFragmentHandler {
   private static final String TAG = "MainFragment";
   private MainViewModel mViewModel;
@@ -312,7 +311,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     mViewModel = new ViewModelProvider(this).get(MainViewModel.class);
     // TODO: Use the ViewModel
 
-    //downResource(false);
     copyResource();
     initMetaService();
   }
@@ -766,16 +764,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           break;
       }
     }
-
-    @Override
-    public void onVideoPublishStateChanged(String channel, int oldState, int newState, int elapseSinceLastState) {
-    }
-
-    @Override
-    public void onLocalVideoStateChanged(int localVideoState, int error) {
-    }
-
-
   };
 
   private void joinChannel(String channelId) {
@@ -919,57 +907,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       return POSITION_POST_CAPTURER;
     }
   };
-
-//  public void saveBitmap2Gallery(Bitmap bm){
-//    long currentTime = System.currentTimeMillis();
-//
-//    // name the file
-//    String imageFileName = "IMG_AGORA_"+ currentTime + ".jpg";
-//    String imageFilePath;
-//
-//    // write to file
-//
-//    OutputStream outputStream;
-//    ContentResolver resolver = requireContext().getContentResolver();
-//    ContentValues newScreenshot = new ContentValues();
-//    Uri insert;
-//    newScreenshot.put(MediaStore.Images.ImageColumns.DATE_ADDED,currentTime);
-//    newScreenshot.put(MediaStore.Images.ImageColumns.DISPLAY_NAME, imageFileName);
-//    newScreenshot.put(MediaStore.Images.ImageColumns.MIME_TYPE, "image/jpg");
-//    newScreenshot.put(MediaStore.Images.ImageColumns.WIDTH, bm.getWidth());
-//    newScreenshot.put(MediaStore.Images.ImageColumns.HEIGHT, bm.getHeight());
-//    try {
-//      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-//        newScreenshot.put(MediaStore.Images.ImageColumns.RELATIVE_PATH,imageFilePath);
-//      }else{
-//        // make sure the path is existed
-//        File imageFileDir = new File(imageFilePath);
-//        if(!imageFileDir.exists()){
-//          boolean mkdir = imageFileDir.mkdirs();
-//          if(!mkdir) {
-//            return;
-//          }
-//        }
-//        newScreenshot.put(MediaStore.Images.ImageColumns.DATA, imageFilePath+imageFileName);
-//        newScreenshot.put(MediaStore.Images.ImageColumns.TITLE, imageFileName);
-//      }
-//
-//      // insert a new image
-//      insert = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, newScreenshot);
-//      // write data
-//      outputStream = resolver.openOutputStream(insert);
-//
-//      bm.compress(Bitmap.CompressFormat.PNG, 80, outputStream);
-//      outputStream.flush();
-//      outputStream.close();
-//
-//      newScreenshot.clear();
-//      newScreenshot.put(MediaStore.Images.ImageColumns.SIZE, new File(imageFilePath).length());
-//      resolver.update(insert, newScreenshot, null, null);
-//    } catch (Exception e) {
-//      e.printStackTrace();
-//    }
-//  }
 
   private final IAudioFrameObserver audioFrameObserver = new IAudioFrameObserver() {
     @Override
@@ -1215,126 +1152,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     mMetaBoltDataHandler = MetaBoltManager.instance();
   }
 
-  private void checkZipAllFiles(String checkUrl) {
-    if (mWaitDownloadUrlList.contains(checkUrl)) {
-      ++mWaitCount;
-    }
-
-    if (mWaitDownloadUrlList.size() == mWaitCount) {
-      new Thread(() -> {
-        Log.i(TAG, "start unzip all files...");
-        List<String> zipSuccessFileList = new ArrayList<>();
-        for (String url : mWaitDownloadUrlList) {
-          try {
-            String zipFileName = url.substring(url.lastIndexOf("/") + 1); // video?filename=xxx.zip
-            String downFilePath = DownloadUtil.get().getDownloadPath(Objects.requireNonNull(getContext())) + File.separator + zipFileName;
-            boolean zipRet = FileUtils.unZipUtil(downFilePath, DownloadUtil.get().getDownloadPath(Objects.requireNonNull(getContext())) + File.separator, true);
-            if (!zipRet) {
-              FileUtils.deleteDir(downFilePath);
-              showInnerToast("解压 " + zipFileName + " 失败, 需要去点重新下载!!!");
-            } else {
-              String zipResFileName = zipFileName.substring(zipFileName.lastIndexOf("=") + 1, zipFileName.lastIndexOf("."));
-              zipSuccessFileList.add(zipResFileName);
-            }
-          } catch (Exception e) {
-            Log.e(TAG, "onDownloadSuccess, failed: " + e);
-          }
-        };
-        mWaitDownloadUrlList.clear();
-      }).start();
-      mWaitCount = 0;
-    }
-  }
-
-  /**
-   * 资源相关 by Hsu
-   */
-  public void onDownloadSuccess(String url, String path, boolean isExist) {
-    Log.i(TAG, "onDownloadSuccess url: " + url + ", path: " + path + ", isExist: " + isExist);
-    checkZipAllFiles(url);
-  }
-
-  @Override
-  public void onDownloading(int progress) {
-  }
-
-  @Override
-  public void onDownloadFailed(String url) {
-    Log.e(TAG, "onDownloadFailed url: " + url);
-    checkZipAllFiles(url);
-    showInnerToast("下载资源 " + url.substring(url.lastIndexOf("/") + 1) + " 出错, 请检查网络");
-  }
-
-  private void filtrateFiles(List<String> fileList) {
-    List<String> removeList = new ArrayList<>();
-    for (String file : fileList) {
-      if (file.contentEquals("Store") ||
-          file.contentEquals("json") ||
-          file.contentEquals("manifest") ||
-          file.contentEquals("clothes") ||
-          file.contentEquals("listeningtomusic"))
-      {
-        removeList.add(file);
-      }
-    }
-
-    for (String string : removeList) {
-      fileList.remove(string);
-    }
-  }
-
-  public void updateDanceList(List<String> musicNameList) {
-    if (musicNameList.isEmpty() || !mMusicFileList.isEmpty()) {
-      return;
-    }
-
-    filtrateFiles(musicNameList);
-    mMusicFileList.addAll(musicNameList);
-  }
-
-  public void updateBeatList(List<String> musicNameList) {
-    if (musicNameList.isEmpty() || !mMusicFileList.isEmpty()) {
-      return;
-    }
-
-    filtrateFiles(musicNameList);
-    mMusicFileList.addAll(musicNameList);
-  }
-
-  public void updateMusicList(List<String> musicNameList) {
-    if (musicNameList.isEmpty() || !mMusicFileList.isEmpty()) {
-      return;
-    }
-
-    filtrateFiles(musicNameList);
-    mMusicFileList.addAll(musicNameList);
-  }
-
-  public void updateBeatAnimationList(List<String> animationList) {
-    if (animationList.isEmpty() || !mBeatAnimationNameList.isEmpty()) {
-      return;
-    }
-
-    filtrateFiles(animationList);
-    mBeatAnimationNameList.addAll(animationList);
-  }
-
-  public void updateRoleModelFile(List<String> modelList) {
-    if (modelList.isEmpty() || !mRoleModelNameList.isEmpty()) {
-      return;
-    }
-
-    filtrateFiles(modelList);
-    mRoleModelNameList.addAll(modelList);
-  }
-
-  private String mRoleModelName = "";
-  public void updateRoleModelList(List<String> roleModelList) {
-    Log.i(TAG, "performanceTest update role list num: " + roleModelList.size() + ", roleName: " + mRoleModelName);
-    filtrateFiles(roleModelList);
-    mRoleModelName = roleModelList.get(0);
-  }
-
   private String getConfigJsonFile() {
     // targetDir="/data/user/0/com.joyy.metabolt.example/files"
     String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath();
@@ -1342,8 +1159,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   }
 
   private String getNewBeatDownPath() {
-    // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.bin
-    // return "/storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/【中国风】天涯/【中国风】天涯.bin";
     String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String template = mMusicFileList.get(mMusicIdx);
     String fileDir = template.substring(0, template.indexOf("."));
@@ -1351,9 +1166,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   }
 
   private String getNewDanceDownPath() {
-    // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.dat
-    // /storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat
-    //return "/storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/【中国风】天涯/【中国风】天涯.dat";
     String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String template = mMusicFileList.get(mMusicIdx);
     String fileDir = template.substring(0, template.indexOf("."));
@@ -1361,60 +1173,28 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   }
 
   private String getAnimationDownPath() {
-    // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/beat/singing/singing
-    // /storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/beat/singing/singing
     String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String template = mBeatAnimationNameList.get(mBeatIdx);
     return targetDir +  "beat" + File.separator + template + File.separator + template;
   }
 
   private String getRemoteAnimationDownPath() {
-    // /storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/beat/jump/jump
-    //String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
     String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String template = mBeatAnimationNameList.get(mBeatIdx);
     return targetDir +  "beat" + File.separator + template + File.separator + template;
   }
 
   private String getRoleModelPath(String roleName) {
-    // /storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/model_pkg_android/female_role.json
-    //String downPath = DownloadUtil.get().getDownloadPath(Objects.requireNonNull(getContext())) + File.separator;
     String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String targetPath = "model_pkg_android" + File.separator + roleName + ".json";
     return targetDir + targetPath;
   }
 
   private String getMusicPath() {
-    // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/【舞曲】爱的主打歌/【舞曲】爱的主打歌.mp3
-    //return "/storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/【中国风】天涯/【中国风】天涯.mp3";
     String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String fileName = mMusicFileList.get(mMusicIdx);
     String fileDir = fileName.substring(0, fileName.indexOf("."));
     return targetDir + kDanceMusicDir + File.separator + fileDir + File.separator + fileName;
-  }
-
-  private ExecutorService threadPoolExecutorService = null;
-  private int mWaitCount = 0;
-  private final List<String> mWaitDownloadUrlList = new CopyOnWriteArrayList<>();
-  private void downResource(boolean isForce) {
-    List<String> downFileList = new ArrayList<>();
-    downFileList.add(kDanceMusicDir);
-    downFileList.add(kBeatAnimationDir);
-    downFileList.add(kRoleModelPkgDir);
-
-    List<String> existFileList = new ArrayList<>();
-    for (String fileName : downFileList) {
-      List<String> getFiles = FileUtils.getFilesAllName(DownloadUtil.get().getDownloadPath(Objects.requireNonNull(getContext())) + File.separator + fileName);
-      if (!isForce && getFiles != null && !getFiles.isEmpty()) {
-        existFileList.add(fileName);
-      } else {
-        mWaitDownloadUrlList.add(kServiceHttpsUrl + fileName + kZipType);
-      }
-    }
-
-    for (String url : mWaitDownloadUrlList) {
-      DownloadUtil.get().download(getContext(), url, this);
-    }
   }
 
   private void copyResource() {
