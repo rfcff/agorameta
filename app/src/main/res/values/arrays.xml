@@ -17,4 +17,7 @@
     <string-array name="music_array">
         <item>天涯</item>
     </string-array>
+    <string-array name="beat_array">
+        <item>singing</item>
+    </string-array>
 </resources>

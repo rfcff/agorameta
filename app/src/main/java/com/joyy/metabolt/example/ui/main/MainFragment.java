@@ -87,7 +87,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private TextView tv_metabolt_show;
   private Button btn_join, btn_init_rtc, btn_music_dance, btn_music_beat;
   private RadioGroup bg_rtc_type, bg_sync_type;
-  private Spinner sp_sync_type, sp_avatar_view_type, sp_music_array;
+  private Spinner sp_sync_type, sp_avatar_view_type, sp_music_res, sp_beat_res;
   private EditText et_uid;
   private EditText et_channel;
   private boolean isUserJoined = false;
@@ -108,6 +108,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private int mMetaboltInitType = METABOLT_INIT_TYPE_AGORA;
   private int mSyncType = SYNC_TYPE_AUDIO;
   private int mAvatarViewType = MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_HALF; // 默认显示半身
+  private int mMusicIdx = 0; // 音乐文件索引
+  private int mBeatIdx = 0; // 节拍文件索引
 
   private RtcEngine mAgoraEngine; // agora声网
 
@@ -150,6 +152,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                            @Nullable Bundle savedInstanceState) {
     mRootView = inflater.inflate(R.layout.main_fragment, container, false);
+    PermissionUtils.checkPermissionAllGranted(getActivity());
     return mRootView;
   }
 
@@ -161,9 +164,12 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     btn_music_dance = view.findViewById(R.id.btn_music_dance);
     btn_music_beat = view.findViewById(R.id.btn_music_beat);
     btn_join.setOnClickListener(this);
+    btn_join.setEnabled(false);
     btn_init_rtc.setOnClickListener(this);
     btn_music_dance.setOnClickListener(this);
+    btn_music_dance.setEnabled(false);
     btn_music_beat.setOnClickListener(this);
+    btn_music_beat.setEnabled(false);
     et_uid = view.findViewById(R.id.et_uid);
     et_uid.setText(String.valueOf(ThreadLocalRandom.current().nextInt(100000, 999999)));
     et_channel = view.findViewById(R.id.et_channel);
@@ -261,12 +267,36 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       }
     });
 
-    sp_music_array = view.findViewById(R.id.sp_music_array);
-    sp_music_array.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+    sp_music_res = view.findViewById(R.id.sp_music_array);
+    sp_music_res.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 
       @Override
       public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+        if (null == mMusicFileList || 0 == mMusicFileList.size() || position == mMusicIdx) return;
         Log.i(TAG, "sp_music_array position:" + position + ", id:" + id);
+        mMusicIdx = position;
+      }
+
+      @Override
+      public void onNothingSelected(AdapterView<?> parent) {
+
+      }
+    });
+
+    sp_beat_res = view.findViewById(R.id.sp_beat_array);
+    sp_beat_res.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+
+      @Override
+      public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+        if (null == mBeatAnimationNameList || 0 == mBeatAnimationNameList.size() || position == mBeatIdx) return;
+        Log.i(TAG, "sp_beat_res position:" + position + ", id:" + id);
+        mBeatIdx = position;
+        if (MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS == mMetaServiceState) {
+          MetaBoltManager.instance().setAnimation(UserConfig.kMetaUid, getAnimationDownPath());
+          if (null != mRemoteUid && !mRemoteUid.isEmpty()) {
+            MetaBoltManager.instance().setAnimation(mRemoteUid, getRemoteAnimationDownPath());
+          }
+        }
       }
 
       @Override
@@ -282,7 +312,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     mViewModel = new ViewModelProvider(this).get(MainViewModel.class);
     // TODO: Use the ViewModel
 
-    downResource(false);
+    //downResource(false);
     copyResource();
     initMetaService();
   }
@@ -381,7 +411,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       case R.id.btn_music_dance: {
         if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING == mAudioMixingState) {
           btn_music_dance.setText(R.string.start_music_dance);
-          mAgoraEngine.pauseAudioMixing();
+          mAgoraEngine.stopAudioMixing();
           MetaBoltManager.instance().stopMusicDance();
         } else if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED == mAudioMixingState
@@ -392,17 +422,13 @@ public class MainFragment extends Fragment implements View.OnClickListener,
             return;
           }
           btn_music_dance.setText(R.string.stop_music_dance);
-          if (0 == mAgoraEngine.getAudioMixingCurrentPosition()) {
-            int ret = mAgoraEngine.startAudioMixing(musicPath, false, false, 1, 0);
-            if (Constants.ERR_OK != ret) {
-              Log.e(TAG, "startAudioMixing " + musicPath + " failed " + mAgoraEngine.getErrorDescription(ret));
-            }
-            ret = mAgoraEngine.getAudioFileInfo(musicPath);
-            if (Constants.ERR_OK != ret) {
-              Log.e(TAG, "getAudioFileInfo " + musicPath + " failed " + mAgoraEngine.getErrorDescription(ret));
-            }
-          } else {
-            mAgoraEngine.resumeAudioMixing();
+          int ret = mAgoraEngine.startAudioMixing(musicPath, false, false, 1, 0);
+          if (Constants.ERR_OK != ret) {
+            Log.e(TAG, "startAudioMixing " + musicPath + " failed " + mAgoraEngine.getErrorDescription(ret));
+          }
+          ret = mAgoraEngine.getAudioFileInfo(musicPath);
+          if (Constants.ERR_OK != ret) {
+            Log.e(TAG, "getAudioFileInfo " + musicPath + " failed " + mAgoraEngine.getErrorDescription(ret));
           }
           String danceMusicPath = getNewDanceDownPath();
           if (danceMusicPath.isEmpty() || !FileUtils.isFileExists(danceMusicPath)) {
@@ -416,7 +442,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       case R.id.btn_music_beat: {
         if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING == mAudioMixingState) {
           btn_music_beat.setText(R.string.start_music_beat);
-          mAgoraEngine.pauseAudioMixing();
+          mAgoraEngine.stopAudioMixing();
           MetaBoltManager.instance().stopMusicBeat();
         } else if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED == mAudioMixingState
             || io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED == mAudioMixingState
@@ -475,7 +501,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     }
     TokenUtils.instance().requestTokenV2(getActivity(),
         UserConfig.kMetaAppId, UserConfig.kMetaUid, UserConfig.kChannelId, UserConfig.kTokenInvalidTime, this);
-    PermissionUtils.checkPermissionAllGranted(getActivity());
   }
 
   @Override
@@ -1147,6 +1172,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     }
     requestToken();
     mIsRtcInitialized = true;
+    btn_join.setEnabled(true);
+    btn_music_dance.setEnabled(true);
+    btn_music_beat.setEnabled(true);
   }
 
   void deinitRTC() {
@@ -1315,70 +1343,54 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
   private String getNewBeatDownPath() {
     // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.bin
-    //String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath();
-//    String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
-//    if (mMusicFileList.size() > 1) {
-//      String music = mMusicFileList.get(0);
-//      if (music.contains("k-pop")) {
-//        music = mMusicFileList.get(1);
-//      }
-//      return targetDir + "/download/new_dance/" + music + "/" + music + ".bin";
-//    }
-//    return "";
-    return "/storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/【中国风】天涯/【中国风】天涯.bin";
+    // return "/storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/【中国风】天涯/【中国风】天涯.bin";
+    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
+    String template = mMusicFileList.get(mMusicIdx);
+    String fileDir = template.substring(0, template.indexOf("."));
+    return targetDir + kDanceMusicDir + File.separator + fileDir + File.separator + fileDir + ".bin";
   }
 
   private String getNewDanceDownPath() {
     // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/Ku_puja_puja/Ku_puja_puja.dat
     // /storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/Pamer_Bojo/Pamer_Bojo.dat
-//    String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
-//    if (mMusicFileList.size() > 1) {
-//      String music = mMusicFileList.get(0);
-//      if (music.contains("k-pop")) {
-//        music = mMusicFileList.get(1);
-//      }
-//      return targetDir + "/download/new_dance/" + music + "/" + music + ".dat";
-//    }
-//    return "";
-    return "/storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/【中国风】天涯/【中国风】天涯.dat";
+    //return "/storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/【中国风】天涯/【中国风】天涯.dat";
+    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
+    String template = mMusicFileList.get(mMusicIdx);
+    String fileDir = template.substring(0, template.indexOf("."));
+    return targetDir + kDanceMusicDir + File.separator + fileDir + File.separator + fileDir + ".dat";
   }
 
   private String getAnimationDownPath() {
     // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/beat/singing/singing
     // /storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/beat/singing/singing
-    String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
-    return targetDir + "/download/beat/singing/singing";
-    //return "/storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/beat/singing/singing";
+    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
+    String template = mBeatAnimationNameList.get(mBeatIdx);
+    return targetDir +  "beat" + File.separator + template + File.separator + template;
   }
 
   private String getRemoteAnimationDownPath() {
     // /storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/beat/jump/jump
-    String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
-    return targetDir + "/download/beat/singing/singing";
-    //return "/storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/beat/jump/jump";
+    //String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
+    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
+    String template = mBeatAnimationNameList.get(mBeatIdx);
+    return targetDir +  "beat" + File.separator + template + File.separator + template;
   }
 
   private String getRoleModelPath(String roleName) {
     // /storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/model_pkg_android/female_role.json
-    String downPath = DownloadUtil.get().getDownloadPath(Objects.requireNonNull(getContext())) + File.separator;
+    //String downPath = DownloadUtil.get().getDownloadPath(Objects.requireNonNull(getContext())) + File.separator;
+    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String targetPath = "model_pkg_android" + File.separator + roleName + ".json";
-    return downPath + targetPath;
+    return targetDir + targetPath;
   }
 
   private String getMusicPath() {
     // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/【舞曲】爱的主打歌/【舞曲】爱的主打歌.mp3
-    // /data/user/0/com.joyy.metabolt.example/files/download/new_dance/qinghuaci/qinghuaci.mp3
-    // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/new_dance/qinghuaci/qinghuaci.mp3
-//    String targetDir = Objects.requireNonNull(getContext()).getExternalFilesDir(null).getAbsolutePath();
-//    if (mMusicFileList.size() > 1) {
-//      String music = mMusicFileList.get(0);
-//      if (music.contains("k-pop")) {
-//        music = mMusicFileList.get(1);
-//      }
-//      return targetDir + "/download/new_dance/" + music + "/" + music + ".mp3";
-//    }
-//    return "";
-    return "/storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/【中国风】天涯/【中国风】天涯.mp3";
+    //return "/storage/emulated/0/Android/data/com.joyy.metabolt.example/files/download/new_dance/【中国风】天涯/【中国风】天涯.mp3";
+    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
+    String fileName = mMusicFileList.get(mMusicIdx);
+    String fileDir = fileName.substring(0, fileName.indexOf("."));
+    return targetDir + kDanceMusicDir + File.separator + fileDir + File.separator + fileName;
   }
 
   private ExecutorService threadPoolExecutorService = null;
@@ -1412,9 +1424,25 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     //共用kLipSyncFileName目录和config.json
     copyFilesFromAssets(kFaceSyncFileName, targetDir + kLipSyncFileName);
     // 拷贝其他资源
-//    copyFilesFromAssets(kDanceMusicDir, targetDir + kDanceMusicDir);
-//    copyFilesFromAssets(kBeatAnimationDir, targetDir + kBeatAnimationDir);
-//    copyFilesFromAssets(kRoleModelPkgDir, targetDir + kRoleModelPkgDir);
+    copyFilesFromAssets(kDanceMusicDir, targetDir + kDanceMusicDir);
+    copyFilesFromAssets(kBeatAnimationDir, targetDir + kBeatAnimationDir);
+    copyFilesFromAssets(kRoleModelPkgDir, targetDir + kRoleModelPkgDir);
+
+    String[] musicItems = new String[mMusicFileList.size()];
+    for (int i = 0; i < mMusicFileList.size(); i ++) {
+      musicItems[i] = mMusicFileList.get(i);
+    }
+    ArrayAdapter<String> musicAdapter = new ArrayAdapter(getContext(), android.R.layout.simple_spinner_item, musicItems);
+    musicAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    sp_music_res.setAdapter(musicAdapter);
+
+    String[] beatItems = new String[mBeatAnimationNameList.size()];
+    for (int i = 0; i < mBeatAnimationNameList.size(); i ++) {
+      beatItems[i] = mBeatAnimationNameList.get(i);
+    }
+    ArrayAdapter<String> beatAdapter = new ArrayAdapter(getContext(), android.R.layout.simple_spinner_item, beatItems);
+    beatAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    sp_beat_res.setAdapter(beatAdapter);
   }
 
   private void copyFilesFromAssets(String assetsPath, String savePath) {
@@ -1431,8 +1459,14 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           }
         }
         for (String fileName : fileList) {
-          copyFileFromAssets(assetsPath + "/" + fileName, savePath, fileName);
-          Log.i(TAG, "copy files from assets, file name: " + fileName);
+          String[] subFileList = Objects.requireNonNull(getActivity()).getAssets().list(assetsPath + File.separator + fileName);
+          if (subFileList != null && subFileList.length > 0) {
+            Log.i(TAG, "copy directory from assets, dir name: " + fileName);
+            copyFilesFromAssets(assetsPath + File.separator + fileName, savePath + File.separator + fileName);
+          } else {
+            copyFileFromAssets(assetsPath + "/" + fileName, savePath, fileName);
+            Log.i(TAG, "copy files from assets, file name: " + fileName);
+          }
         }
       }
     } catch (Exception e) {
@@ -1453,6 +1487,14 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     // 拷贝文件
     String filename = savePath + "/" + saveName;
     File file = new File(filename);
+    if (assetName.startsWith(kDanceMusicDir) && saveName.endsWith(".mp3")) {
+      mMusicFileList.add(saveName);
+    } else if (assetName.startsWith(kBeatAnimationDir)) {
+      if (saveName.equals("handup") || saveName.equals("jump") || saveName.equals("singing")) {
+        mBeatAnimationNameList.add(saveName);
+      }
+    }
+
     if (!file.exists()) {
       try {
         InputStream inStream = Objects.requireNonNull(getActivity()).getAssets().open(assetName);
