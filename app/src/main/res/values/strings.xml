@@ -10,7 +10,6 @@
     <string name="stop_music_dance">停止跳舞</string>
     <string name="start_music_beat">开启节拍</string>
     <string name="stop_music_beat">停止节拍</string>
-    <string name="game_view_content_description">Game view</string>
     <string name="metabolt_function">Metabolt Example</string>
     <string name="metabolt_type_agora">agora</string>
     <string name="metabolt_type_agora_desc">agora通道展示Metabolt虚拟人</string>
@@ -18,4 +17,7 @@
     <string name="metabolt_type_trtc_desc">TRTC通道展示Metabolt虚拟人</string>
     <string name="metabolt_type_thunder">Thunder</string>
     <string name="metabolt_type_thunder_desc">TRTC通道展示Metabolt虚拟人</string>
+    <string name="sync_type_hint">同步类型</string>
+    <string name="sync_type_audio">audio</string>
+    <string name="sync_type_video">video</string>
 </resources>

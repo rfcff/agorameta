@@ -3,14 +3,12 @@ package com.joyy.metabolt.example.utils;
 import android.app.Activity;
 import android.text.TextUtils;
 import android.util.Log;
-import android.widget.Toast;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
 
 import okhttp3.Call;
@@ -100,7 +98,7 @@ public class TokenUtils {
                   mTokenListener.onRequestTokenResult(0, METABOLT_INIT_TYPE_THUNDERBOLT, token, "success");
                   return;
                 } else {
-                  UserConfig.kToken = "";
+                  UserConfig.kMetaToken = "";
                 }
               } catch (JSONException e) {
                 e.printStackTrace();
@@ -119,7 +117,7 @@ public class TokenUtils {
               });
             }
           } else {
-            UserConfig.kToken = "";
+            UserConfig.kMetaToken = "";
             mTokenListener.onRequestTokenResult(-1, METABOLT_INIT_TYPE_THUNDERBOLT, "", "request token fail code=" + response.code());
             Log.e(TAG, "request token fail code=" + response.code());
           }
@@ -225,7 +223,7 @@ public class TokenUtils {
               });
             }
           } else {
-            UserConfig.kToken = "";
+            UserConfig.kMetaToken = "";
             mTokenListener.onRequestTokenResult(-1, mReqType, "", "request token fail code=" + response.code());
             Log.e(TAG, "request token fail code=" + response.code());
           }

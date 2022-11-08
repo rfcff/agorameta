@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="avatar_view_type">
+        <item>全身</item>
+        <item>半身</item>
+        <item>头像</item>
+    </string-array>
+    <string-array name="rtc_type">
+        <item>Agora</item>
+        <item>TRTC</item>
+        <item>Thunder</item>
+    </string-array>
+    <string-array name="sync_type">
+        <item>audio</item>
+        <item>video</item>
+    </string-array>
+    <string-array name="music_array">
+        <item>天涯</item>
+    </string-array>
+</resources>

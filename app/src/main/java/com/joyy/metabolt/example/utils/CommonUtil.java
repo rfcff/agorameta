@@ -18,37 +18,27 @@ public class CommonUtil {
         imm.hideSoftInputFromWindow(editText.getWindowToken(), 0);
     }
 
-    public static byte[] doI420ToNV21(byte[] data, int width, int height) {
-        byte[] ret = new byte[data.length];
+    public static byte[] doI420ToNV21(byte[] ydata, byte[] udata, byte[] vdata, int width, int height) {
         int total = width * height;
-
-        ByteBuffer bufferY = ByteBuffer.wrap(ret, 0, total);
-        ByteBuffer bufferV = ByteBuffer.wrap(ret, total, total / 4);
-        ByteBuffer bufferU = ByteBuffer.wrap(ret, total + total / 4, total / 4);
-
-        bufferY.put(data, 0, total);
+        byte[] ret = new byte[total * 3 / 2];
+        System.arraycopy(ydata, 0, ret, 0, total);
         for (int i = 0; i < total / 4; i += 1) {
-            bufferV.put(data[total + i]);
-            bufferU.put(data[i + total + total / 4]);
+            System.arraycopy(vdata, i, ret, total + 2 * i, 1);
+            System.arraycopy(udata, i, ret, total + 2 * i + 1, 1);
         }
-
         return ret;
     }
 
-    public static byte[] doI420ToNV21(ByteBuffer yBuffer, ByteBuffer uBuffer, ByteBuffer vBuffer, int width, int height) {
+    public static ByteBuffer doI420ToNV21(ByteBuffer ydata, ByteBuffer udata, ByteBuffer vdata, int width, int height) {
         int total = width * height;
-        byte[] ret = new byte[(total * 3)>>1];
-
-        ByteBuffer bufferY = ByteBuffer.wrap(ret, 0, total);
-        ByteBuffer bufferV = ByteBuffer.wrap(ret, total, total / 4);
-        ByteBuffer bufferU = ByteBuffer.wrap(ret, total + total / 4, total / 4);
-
-        bufferY.put(yBuffer);
+        ByteBuffer buf = ByteBuffer.allocate(total * 3 / 2);
+        byte[] uByte = udata.array();
+        byte[] vByte = vdata.array();
+        buf.put(ydata);
         for (int i = 0; i < total / 4; i += 1) {
-            bufferV.put(vBuffer);
-            bufferU.put(uBuffer);
+            buf.put(vByte, 2 * i, 1);
+            buf.put(uByte, 2 * i + 1, 1);
         }
-
-        return ret;
+        return buf;
     }
 }

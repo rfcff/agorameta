@@ -12,7 +12,6 @@ import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 
 import com.metabolt.IMTBLogCallback;
 import com.metabolt.MTBAvatarRole;
@@ -33,10 +32,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import com.joyy.metabolt.example.R;
-import io.agora.rtc.Constants;
+import com.thunder.livesdk.ThunderRtcConstant;
 
 
-public class MetaBoltManager extends MTBServiceEventHandler implements View.OnClickListener, IMTBLogCallback, IMetaBoltDataHandler, MTBTrackEngine.TrackFaceEmotionHandler, MTBTrackEngine.TrackMusicBeatHandler, MTBTrackEngine.TrackMusicDanceHandler, Handler.Callback {
+public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogCallback,
+    IMetaBoltDataHandler,
+    MTBTrackEngine.TrackFaceEmotionHandler,
+    MTBTrackEngine.TrackMusicBeatHandler,
+    MTBTrackEngine.TrackMusicDanceHandler,
+    Handler.Callback {
   private static final String TAG = "MetaBoltManager";
   public static final int kMaxViewNum = 6;
 
@@ -63,7 +67,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
   private String mAIModelPath = null;
   private MetaBoltManager(String modelPath) {
     mAIModelPath = modelPath;
-    UserConfig.kAIModelPath = mAIModelPath;
+    UserConfig.kMetaAIModelPath = mAIModelPath;
   }
 
   public String getAIModelPath() {
@@ -121,9 +125,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     deInitHandleSend();
     stopHandler();
     for (Map.Entry<Integer, MTBAvatarView> viewEntry : mAvatarViewMap.entrySet()) {
-      LinearLayout linearLayout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(viewEntry.getKey()));
-      linearLayout.setBackgroundColor(Color.WHITE);
-      linearLayout.removeView(viewEntry.getValue());
+      FrameLayout layout = mRootView.get().findViewById(getAvatarContainerViewIdByIndex(viewEntry.getKey()));
+      layout.setBackgroundColor(Color.WHITE);
+      layout.removeView(viewEntry.getValue());
       mMetaBoltSrv.destroyAvatarView(viewEntry.getValue());
     }
 
@@ -256,7 +260,6 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     //layout.setBackgroundColor(Color.GRAY);
     view.setLayoutParams(layout.getLayoutParams());
     layout.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-    view.setOnClickListener(this);
     //view.bringToFront();
 
     return 0;
@@ -384,11 +387,10 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 
   @Override
   public void onLocalAudioStatusChanged(int status, int errorReason) {
-//    if (status == ThunderRtcConstant.LocalAudioStreamStatus.THUNDER_LOCAL_AUDIO_STREAM_STATUS_STOPPED ||
-//        status == ThunderRtcConstant.LocalAudioStreamStatus.THUNDER_LOCAL_AUDIO_STREAM_STATUS_FAILED) {
-    if (Constants.LOCAL_AUDIO_STREAM_STATE_STOPPED == status || Constants.LOCAL_AUDIO_STREAM_STATE_FAILED == status) {
+    if (status == ThunderRtcConstant.LocalAudioStreamStatus.THUNDER_LOCAL_AUDIO_STREAM_STATUS_STOPPED ||
+        status == ThunderRtcConstant.LocalAudioStreamStatus.THUNDER_LOCAL_AUDIO_STREAM_STATUS_FAILED) {
       if (isInit()) {
-        MTBAvatarRole myRole = mAvatarRoleMap.get(UserConfig.kUid);
+        MTBAvatarRole myRole = mAvatarRoleMap.get(UserConfig.kMetaUid);
         if (myRole != null && (mIsOpenAudioEmotion || mIsOpenVideoEmotion)) {
           myRole.resetFaceEmotion();
         }
@@ -487,7 +489,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 
   @Override
   public int onRecvTrackEmotionInfo(MTBFaceEmotion info) {
-    MTBAvatarRole role = mAvatarRoleMap.get(UserConfig.kUid);
+    MTBAvatarRole role = mAvatarRoleMap.get(UserConfig.kMetaUid);
     if (role != null) {
       role.setFaceEmotion(info);
     }
@@ -499,7 +501,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 
   @Override
   public int onRecvTrackBetaInfo(MTBMusicBeatInfo info) {
-    MTBAvatarRole role = mAvatarRoleMap.get(UserConfig.kUid);
+    MTBAvatarRole role = mAvatarRoleMap.get(UserConfig.kMetaUid);
     if (role != null) {
       role.setMusicBeat(info);
     }
@@ -511,7 +513,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
 
   @Override
   public int onRecvTrackDanceInfo(MTBMusicDanceInfo info) {
-    MTBAvatarRole role = mAvatarRoleMap.get(UserConfig.kUid);
+    MTBAvatarRole role = mAvatarRoleMap.get(UserConfig.kMetaUid);
     if (role != null) {
       role.setMusicDance(info);
     }
@@ -684,7 +686,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
   private final int kThunderMaxLengthOfSEI = 500; // 500 is max SEI length of audio opus dse
   private final ByteBuffer mSendMediaExtraInfoBuffer = ByteBuffer.allocate(kThunderMaxLengthOfSEI);
   public void handleSendMediaExtraInfo() {
-    if (mAudioPublishStatus == Constants.PUB_STATE_PUBLISHED) {
+    if (mAudioPublishStatus == ThunderRtcConstant.ThunderLocalAudioPublishStatus.THUNDER_LOCAL_AUDIO_PUBLISH_STATUS_START) {
       if ((mIsOpenVideoEmotion || mIsOpenAudioEmotion || mIsOpenDance || mIsOpenBeat)) {
         synchronized (mDataLock) {
           if (mFaceEmotion == null && mDanceInfo == null && mBeatInfo == null) {
@@ -894,142 +896,15 @@ public class MetaBoltManager extends MTBServiceEventHandler implements View.OnCl
     }
   }
 
-    /**
-     *  UI
-     */
-    private int getAvatarContainerViewIdByIndex(int index) {
-      switch (index) {
-        case 0:
-          return R.id.fl_local_meta;
-        default:
-          return R.id.fl_remote_meta;
-      }
-    }
-
-    private int getAvatarViewColorIdByIndex(int index) {
-      if (index == 0) {
-        return Color.BLUE;
-      } else if (index == 1) {
-        return Color.RED;
-      } else if (index == 2) {
-        return Color.GRAY;
-      } else if (index == 3) {
-        return Color.GREEN;
-      } else if (index == 4) {
-        return Color.BLACK;
-      } else if (index == 5) {
-        return Color.YELLOW;
-      }
-      return Color.LTGRAY;
-    }
-
-    boolean mIsFullScreenNow = false;
-    private void controlOtherView(boolean hide) {
-//    int value = hide ? View.GONE : View.VISIBLE;
-//    mRootView.get().findViewById(R.id.meta_view_rect).setVisibility(value);
-//    mRootView.get().findViewById(R.id.meta_tab_host_test).setVisibility(value);
-//    mRootView.get().findViewById(R.id.meta_tab_host_test2).setVisibility(value);
-    }
-
-    @Override
-    public void onClick(View view) {
-//    Log.i(TAG, "onClick, is full view now: " + mIsFullScreenNow + ", view object: " + view);
-//    LinearLayout fullLayout = mRootView.get().findViewById(R.id.metabolt_full_view_container);
-//    if (fullLayout == null) {
-//      return ;
-//    }
-//
-//    try {
-//      // OPPO-CPH2127总是在这里报错：java.lang.IllegalStateException: The specified child already has a parent. You must call removeView() on the child's parent first.
-//      int findIndex = -1;
-//      if (!mIsFullScreenNow) {
-//        // 放大变全屏
-//        for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
-//          if (entry.getValue() == view) {
-//            findIndex = entry.getKey();
-//            entry.getValue().setShowOnTop(false);
-//          }
-//        }
-//
-//        if (findIndex != -1) {
-//          fullLayout.removeAllViews();
-//          fullLayout.setVisibility(View.VISIBLE);
-//          controlOtherView(true);
-//          ViewParent parent = view.getParent();
-//          if (parent!=null) {
-//            ((ViewGroup)parent).removeView(view);
-//          }
-//          view.setLayoutParams(new LinearLayout.LayoutParams(
-//              ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
-//          fullLayout.addView(view);
-//          view.setVisibility(View.VISIBLE);
-//          ((MTBAvatarView)view).setShowOnTop(true);
-//        }
-//
-//        mIsFullScreenNow = !mIsFullScreenNow;
-//      } else {
-//        // 还原非全屏
-//        ViewParent parent = view.getParent();
-//        if (parent!=null) {
-//          ((ViewGroup)parent).removeView(view);
-//        }
-//        if (view instanceof MTBAvatarView) {
-//          ((MTBAvatarView)view).setShowOnTop(false);
-//        }
-//        controlOtherView(false);
-//        fullLayout.removeAllViews();
-//        fullLayout.setVisibility(View.GONE);
-//        for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
-//          if (entry.getValue() == view) {
-//            findIndex = entry.getKey();
-//          }
-//        }
-//        int containerId = getAvatarContainerViewIdByIndex(findIndex);
-//        LinearLayout windowLayout = mRootView.get().findViewById(containerId);
-//        windowLayout.addView(view);
-//
-//        mIsFullScreenNow = !mIsFullScreenNow;
-//      }
-//    } catch (Exception e) {
-//      Log.e(TAG, e.getMessage());
-//      onClick(view);
-//    }
-    }
-
-    public void onHiddenChanged(boolean hidden) {
-//    if (mIsFullScreenNow) {
-//      LinearLayout fullLayout = mRootView.get().findViewById(R.id.metabolt_full_view_container);
-//      if (hidden) {
-//        fullLayout.setVisibility(View.GONE);
-//      } else {
-//        fullLayout.setVisibility(View.VISIBLE);
-//        View childView = fullLayout.getChildAt(0);
-//        ((MTBAvatarView)childView).refresh();
-//      }
-//    } else {
-//      controlOtherView(hidden);
-//      if (!hidden) {
-//        for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
-//          MTBAvatarView view = entry.getValue();
-//          view.setVisibility(View.VISIBLE);
-//          view.refresh();
-//        }
-//      }
-//    }
-    }
-
-    public void resumeView() {
-//    if (mIsFullScreenNow) {
-//      controlOtherView(true);
-//      LinearLayout fullLayout = mRootView.get().findViewById(R.id.metabolt_full_view_container);
-//      fullLayout.setVisibility(View.VISIBLE);
-//    } else {
-//      controlOtherView(false);
-//      for (Map.Entry<Integer, MTBAvatarView> entry : mAvatarViewMap.entrySet()) {
-//        MTBAvatarView view = entry.getValue();
-//        view.setVisibility(View.VISIBLE);
-//        view.refresh();
-//      }
-//    }
+  /**
+   *  UI
+   */
+  private int getAvatarContainerViewIdByIndex(int index) {
+    switch (index) {
+      case 0:
+        return R.id.fl_local_meta;
+      default:
+        return R.id.fl_remote_meta;
     }
   }
+}
