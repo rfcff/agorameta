@@ -568,7 +568,9 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
    */
   @Override
   public void handlerCaptureAudioData(byte[] data, int dataSize, int sampleRate, int channel, boolean vad) {
-    if (mMetaBoltSrv != null && mMetaBoltSrv.getMetaBoltServiceState() == MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS) {
+    if (null != mMetaBoltSrv
+        && null != mMetaBoltSrv.getTrackEngine()
+        && MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS == mMetaBoltSrv.getMetaBoltServiceState()) {
       mMetaBoltSrv.getTrackEngine().applyAudioPCMData(data, channel, sampleRate, 16, vad);
     }
   }
@@ -625,9 +627,10 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
   @Override
   public void handleCaptureVideoFrame(int width, int height, byte[] data, int imageFormat, boolean isHorizontalFlip,
                                       int rotation) {
-    if (mMetaBoltSrv != null &&
-        mMetaBoltSrv.getMetaBoltServiceState() == MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS) {
-
+    if (null != mMetaBoltSrv
+        && null != mMetaBoltSrv.getTrackEngine()
+        && MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS == mMetaBoltSrv.getMetaBoltServiceState())
+    {
       MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame(width, height,
           MetaBoltTypes.MTBPixelFormat.MTB_PIXEL_FORMAT_NV21);
       videoFrame.videoDataList.add(data);

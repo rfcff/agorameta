@@ -167,11 +167,11 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     btn_music_dance = view.findViewById(R.id.btn_music_dance);
     btn_music_beat = view.findViewById(R.id.btn_music_beat);
     btn_join.setOnClickListener(this);
-    btn_join.setEnabled(false);
     btn_init_rtc.setOnClickListener(this);
     btn_music_dance.setOnClickListener(this);
-    btn_music_dance.setEnabled(false);
     btn_music_beat.setOnClickListener(this);
+    btn_join.setEnabled(false);
+    btn_music_dance.setEnabled(false);
     btn_music_beat.setEnabled(false);
     et_uid = view.findViewById(R.id.et_uid);
     et_uid.setText(String.valueOf(ThreadLocalRandom.current().nextInt(100000, 999999)));
@@ -411,6 +411,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       case R.id.btn_init_rtc: {
         if (mIsRtcInitialized) {
           deinitRTC();
+          btn_join.setEnabled(false);
+          btn_music_dance.setEnabled(false);
+          btn_music_beat.setEnabled(false);
           btn_init_rtc.setText(getString(R.string.init_rtc));
         } else {
           initRTC();
@@ -421,12 +424,13 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       case R.id.btn_join: {
         if (mIsUserJoined) {
           mIsUserJoined = false;
-          mMusicPlayingState = io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED;
-          mIsRemoteMetaViewNeedShow = false;
-          mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;
+          mMusicPlayingState = MUSIC_PLAY_STATE_STOPPED;
           btn_join.setText(getString(R.string.join_channel));
           leaveChannel(false);
 
+          //mIsRemoteMetaViewNeedShow = false;
+          mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;
+          MetaBoltManager.instance().registerMgrCallback(null);
           MetaBoltManager.instance().destroyAvatarRole(UserConfig.kMetaUid);
           MetaBoltManager.instance().destroyAvatarView(0);
           if (null != mRemoteUid) {
@@ -434,6 +438,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
             MetaBoltManager.instance().destroyAvatarView(1);
 			      mRemoteUid = null;
           }
+          MetaBoltManager.instance().deInit();
         } else {
           joinChannel();
           initMetaboltRole();
@@ -567,6 +572,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       Log.i(TAG, String.format("local user %s leaveChannel!", UserConfig.kMetaUid));
       showInnerToast(String.format("local user %s leaveChannel!", UserConfig.kMetaUid));
       mIsUserJoined = false;
+
       if (null != mMetaBoltDataHandler) {
         mMetaBoltDataHandler.onLeaveRoom();
       }
@@ -587,6 +593,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         @Override
         public void run() {
           btn_join.setEnabled(true);
+          btn_music_dance.setEnabled(true);
+          btn_music_beat.setEnabled(true);
           btn_join.setText(getString(R.string.leave_channel));
           // 创建createDataStream,发送音频sei
           DataStreamConfig dataStreamConfig = new DataStreamConfig();
@@ -1456,6 +1464,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           @Override
           public void run() {
             btn_join.setEnabled(true);
+            btn_music_dance.setEnabled(true);
+            btn_music_beat.setEnabled(true);
             btn_join.setText(getString(R.string.leave_channel));
             if (null != mMetaBoltDataHandler) {
               mMetaBoltDataHandler.onJoinRoomSuccess(UserConfig.kChannelId, UserConfig.kMetaUid, (int)result);
