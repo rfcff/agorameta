@@ -29,6 +29,14 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@color/teal_700" />
+
+        <com.tencent.rtmp.ui.TXCloudVideoView
+            android:id="@+id/trtc_local"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:visibility="gone"
+            android:background="@color/teal_700" />
     </LinearLayout>
     <LinearLayout
         android:id="@+id/ll_remote_video"
@@ -50,6 +58,14 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
+            android:background="@color/purple_500" />
+
+        <com.tencent.rtmp.ui.TXCloudVideoView
+            android:id="@+id/trtc_remote"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:visibility="gone"
             android:background="@color/purple_500" />
     </LinearLayout>
 

@@ -17,5 +17,4 @@ public class UserConfig {
   public static String kAgoraToken = "";
 
   public static int kTokenInvalidTime = 24 * 3600;
-  public static boolean kIsServerGenToken = true; // 是否服务器生成token
 }
