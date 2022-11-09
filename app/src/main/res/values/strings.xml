@@ -15,7 +15,7 @@
     <string name="metabolt_type_trtc">TRTC</string>
     <string name="metabolt_type_trtc_desc">TRTC通道展示Metabolt虚拟人</string>
     <string name="metabolt_type_thunder">Thunder</string>
-    <string name="metabolt_type_thunder_desc">TRTC通道展示Metabolt虚拟人</string>
+    <string name="metabolt_type_thunder_desc">Thunder通道展示Metabolt虚拟人</string>
     <string name="sync_type_hint">同步类型</string>
     <string name="sync_type_audio">audio</string>
     <string name="sync_type_video">video</string>

@@ -429,9 +429,23 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         if (mIsRtcInitialized) {
           deinitRTC();
           btn_join.setEnabled(false);
+          btn_join.setText(R.string.join_channel);
           btn_music_dance.setEnabled(false);
+          btn_music_dance.setText(R.string.start_music_dance);
           btn_music_beat.setEnabled(false);
+          btn_music_beat.setText(R.string.start_music_beat);
           btn_init_rtc.setText(getString(R.string.init_rtc));
+
+          mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;
+          MetaBoltManager.instance().registerMgrCallback(null);
+          MetaBoltManager.instance().destroyAvatarRole(UserConfig.kMetaUid);
+          MetaBoltManager.instance().destroyAvatarView(0);
+          if (null != mRemoteUid) {
+            MetaBoltManager.instance().destroyAvatarRole(mRemoteUid);
+            MetaBoltManager.instance().destroyAvatarView(1);
+            mRemoteUid = null;
+          }
+          MetaBoltManager.instance().deInit();
         } else {
           initRTC();
           btn_init_rtc.setText(getString(R.string.deinit_rtc));
@@ -905,6 +919,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       mAgoraEngine.stopAudioMixing();
       mAgoraEngine.stopPreview();
       mAgoraEngine.leaveChannel();
+      if (null != mRemoteUid) {
+        mAgoraEngine.setupRemoteVideo(new VideoCanvas(null, Constants.RENDER_MODE_HIDDEN, Integer.valueOf(mRemoteUid)));
+      }
       if (isDeInit) {
         mMainLooperHandler.post(RtcEngine::destroy);
         mAgoraEngine = null;
@@ -961,6 +978,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     if (mTRTCCloud != null) {
       mTRTCCloud.stopLocalAudio();
       mTRTCCloud.stopLocalPreview();
+      if (null != mRemoteUid) {
+        mTRTCCloud.stopRemoteView(mRemoteUid, TRTCCloudDef.TRTC_VIDEO_STREAM_TYPE_BIG);
+      }
       mTRTCCloud.exitRoom();
       mTRTCCloud.setListener(null);
       mTRTCCloud.setAudioFrameListener(null);
