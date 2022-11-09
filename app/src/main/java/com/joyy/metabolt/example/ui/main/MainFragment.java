@@ -22,6 +22,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -82,6 +83,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private TextView tv_metabolt_show;
   private Button btn_join, btn_init_rtc, btn_music_dance, btn_music_beat;
   private RadioGroup bg_rtc_type;
+  private RadioButton rb_agora, rb_trtc, rb_thunder;
   private Spinner sp_sync_type, sp_avatar_view_type, sp_music_res, sp_beat_res;
   private EditText et_uid;
   private EditText et_channel;
@@ -184,10 +186,25 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     fl_remote_meta = view.findViewById(R.id.fl_remote_meta);
     fl_remote = view.findViewById(R.id.fl_remote);
     tv_metabolt_show = view.findViewById(R.id.tv_metabolt_show);
+
+    rb_agora = view.findViewById(R.id.rb_agora);
+    rb_trtc = view.findViewById(R.id.rb_trtc);
+    rb_thunder = view.findViewById(R.id.rb_thunder);
     bg_rtc_type = view.findViewById(R.id.rg_rtc_type);
     bg_rtc_type.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
       @Override
       public void onCheckedChanged(RadioGroup group, int checkedId) {
+        if (mIsRtcInitialized) {
+          showInnerToast("RTC is initialized, cannot change now!!");
+          if (METABOLT_INIT_TYPE_TRTC == mMetaboltInitType) {
+            rb_trtc.setChecked(true);
+          } else if (METABOLT_INIT_TYPE_THUNDERBOLT == mMetaboltInitType) {
+            rb_thunder.setChecked(true);
+          } else {
+            rb_agora.setChecked(true);
+          }
+          return;
+        }
         switch (checkedId) {
           case R.id.rb_trtc:
             mMetaboltInitType = METABOLT_INIT_TYPE_TRTC;
@@ -446,6 +463,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         break;
       }
       case R.id.btn_music_dance: {
+        if (!mIsUserJoined || MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS != mMetaServiceState) {
+          return;
+        }
         if (MUSIC_PLAY_STATE_STARTING == mMusicPlayingState) {
           playMusic(false);
           btn_music_dance.setText(R.string.start_music_dance);
@@ -463,6 +483,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         break;
       }
       case R.id.btn_music_beat: {
+        if (!mIsUserJoined || MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS != mMetaServiceState) {
+          return;
+        }
         if (MUSIC_PLAY_STATE_STARTING == mMusicPlayingState) {
           playMusic(false);
           btn_music_beat.setText(R.string.start_music_beat);
@@ -1262,6 +1285,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     if (MetaBoltManager.kDanceType != type) {
       switch (mMetaboltInitType) {
         case METABOLT_INIT_TYPE_TRTC: {
+          if (null == mTRTCCloud) return 0;
           mTRTCCloud.sendCustomCmdMsg(TRTC_CMDID, buffer, true, true);
           break;
         }
@@ -1269,6 +1293,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           break;
         }
         default: {
+          if (null == mAgoraEngine) return 0;
           ret = mAgoraEngine.sendStreamMessage(mAgoraAudioStreamId, buffer);
           if (ret < Constants.ERR_OK) {
             Log.e(TAG, "agora sendStreamMessage error:" + ret + ", desc:" + RtcEngine.getErrorDescription(ret));
