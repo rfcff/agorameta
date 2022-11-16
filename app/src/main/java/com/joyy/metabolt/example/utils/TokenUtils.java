@@ -154,6 +154,7 @@ public class TokenUtils {
     } catch (JSONException e) {
       e.printStackTrace();
     }
+    Log.i(TAG, "requestExternalToken type:" + type + ", param:" + jasonObj.toString());
     String servUrl = AGORA_URL;
     if (METABOLT_INIT_TYPE_TRTC == type) {
       servUrl = TRTC_URL;

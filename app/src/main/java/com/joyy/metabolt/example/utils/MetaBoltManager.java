@@ -45,7 +45,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
   public static final int kMaxViewNum = 6;
 
   private Handler mHandler = null;
-  private final int kHandlerDelayMs = 40;
+  private final int kHandlerDelayMs = 33; // 需要比25fps稍微快一点，不然发SEI可能会略低一点
 
   @SuppressLint("StaticFieldLeak")
   private static MetaBoltManager mInstance = null;
@@ -588,11 +588,8 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
     for (int i = height / 2; i < height; i++) {
       System.arraycopy(nv21Bytes, i * width, nv21AlignBytes, i * (width + 16), width);
     }
-    MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame(width, height,
-        MetaBoltTypes.MTBPixelFormat.MTB_PIXEL_FORMAT_NV21);
-    videoFrame.videoDataList.add(nv21AlignBytes);
-    videoFrame.videoDataStrideList.add(width + 16);
-    videoFrame.videoDataStrideList.add(width + 16);
+    MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame();
+    videoFrame.initFromNV21Data(nv21AlignBytes, width + 16, width, height);
     mMetaBoltSrv.getTrackEngine().applyVideoData(videoFrame, isHorizontalFlip, rotation);
   }
 
@@ -615,33 +612,73 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
     for (int i = 0; i < height / 2; i++) {
       System.arraycopy(nv21Bytes, width * height + i * width, nv21VUBytes,  i * vuStride, width);
     }
-    MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame(width, height,
-        MetaBoltTypes.MTBPixelFormat.MTB_PIXEL_FORMAT_NV21);
-    videoFrame.videoDataList.add(nv21YBytes);
-    videoFrame.videoDataList.add(nv21VUBytes);
-    videoFrame.videoDataStrideList.add(yStride);
-    videoFrame.videoDataStrideList.add(vuStride);
+    MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame();
+    videoFrame.initFromNV21PlanesData(nv21YBytes, yStride, nv21VUBytes, vuStride, width, height);
+    mMetaBoltSrv.getTrackEngine().applyVideoData(videoFrame, isHorizontalFlip, rotation);
+  }
+
+  byte[] i420Bytes;
+  private void i420BytesTest(byte[] nv21Bytes, int width, int height, boolean isHorizontalFlip, int rotation) {
+    int yStride = width;
+    int uStride = width;
+    int vStride = width;
+    int size = yStride * height + uStride * height / 2 + vStride * height / 2;
+    if (i420Bytes == null || i420YBytes.length != size) {
+      i420YBytes = new byte[size];
+    }
+
+//        ImageUtil.nv21TransToI420(nv21Bytes, width, height, 0, false, i420Bytes);
+
+    MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame();
+//        videoFrame.initFromI420PlanesData(i420Bytes, yStride, width, height);
+    mMetaBoltSrv.getTrackEngine().applyVideoData(videoFrame, isHorizontalFlip, rotation);
+  }
+
+  byte[] i420YBytes;
+  byte[] i420UBytes;
+  byte[] i420VBytes;
+  private void i420BytesPlanesTest(byte[] nv21Bytes, int width, int height, boolean isHorizontalFlip, int rotation) {
+    int yStride = width;
+    int uStride = width;
+    int vStride = width;
+    int ySize = yStride * height;
+    int uSize = uStride * height / 2;
+    int vSize = vStride * height / 2;
+
+    if (i420YBytes == null || i420YBytes.length != ySize) {
+      i420YBytes = new byte[ySize];
+    }
+    if (i420UBytes == null || i420UBytes.length != uSize) {
+      i420UBytes = new byte[uSize];
+    }
+    if (i420VBytes == null || i420VBytes.length != vSize) {
+      i420VBytes = new byte[vSize];
+    }
+
+//        ImageUtil.nv21TransToI420(nv21Bytes, width, height, 0, false, i420YBytes, i420UBytes, i420VBytes);
+
+    MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame();
+//        videoFrame.initFromI420PlanesData(i420YBytes, yStride, i420UBytes, uStride, i420VBytes, vStride, width, height);
     mMetaBoltSrv.getTrackEngine().applyVideoData(videoFrame, isHorizontalFlip, rotation);
   }
 
   @Override
   public void handleCaptureVideoFrame(int width, int height, byte[] data, int imageFormat, boolean isHorizontalFlip,
                                       int rotation) {
-    if (null != mMetaBoltSrv
-        && null != mMetaBoltSrv.getTrackEngine()
-        && MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS == mMetaBoltSrv.getMetaBoltServiceState())
-    {
-      MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame(width, height,
-          MetaBoltTypes.MTBPixelFormat.MTB_PIXEL_FORMAT_NV21);
-      videoFrame.videoDataList.add(data);
-      videoFrame.videoDataStrideList.add(width);
-      videoFrame.videoDataStrideList.add(width);
+    if (mMetaBoltSrv != null &&
+        mMetaBoltSrv.getMetaBoltServiceState() == MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS) {
+
+      MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame();
+      videoFrame.initFromNV21Data(data, width, height);
       mMetaBoltSrv.getTrackEngine().applyVideoData(videoFrame, isHorizontalFlip, rotation);
 
 //            //nv21数据对齐输入测试
 //            nv21BytesAlignTest(data, width, height, isHorizontalFlip, rotation);
 //            //nv21数据多plane输入测试
 //            nv21BytesPlanesTest(data, width, height, isHorizontalFlip, rotation);
+//            //I420数据测试
+//            i420BytesPlanesTest(data, width, height, isHorizontalFlip, rotation);
+//            i420BytesTest(data, width, height, isHorizontalFlip, rotation);
     }
   }
 

@@ -84,7 +84,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private Button btn_join, btn_init_rtc, btn_music_dance, btn_music_beat;
   private RadioGroup bg_rtc_type;
   private RadioButton rb_agora, rb_trtc, rb_thunder;
-  private Spinner sp_sync_type, sp_avatar_view_type, sp_music_res, sp_beat_res;
+  private Spinner sp_sync_type, sp_avatar_view_type, sp_music_res, sp_beat_res, sp_role_res;
   private EditText et_uid;
   private EditText et_channel;
   private Handler mMainLooperHandler = new Handler(Looper.getMainLooper());
@@ -134,19 +134,35 @@ public class MainFragment extends Fragment implements View.OnClickListener,
    */
   private int mMusicIdx = 0; // 音乐文件索引
   private int mBeatIdx = 0; // 节拍文件索引
+  private int mRoleIdx = 0; // 角色索引
   private final String kLipSyncFileName = "lipsync";
   private final String kFaceSyncFileName = "facesync";
-  private final String kConfigJsonFileName = "/lipsync/config.json";
+  private final String kConfigJsonFileName = "config.json";
 
   private final String kRoleModelMale = "male_role";
   private final String kRoleModelFemale = "female_role";
 
-  private final static String kDanceMusicDir = "new_dance";
-  private final static String kBeatAnimationDir = "beat";
-  private final static String kRoleModelPkgDir = "model_pkg_android";
+//  private final static String kDanceMusicDir = "new_dance";
+//  private final static String kBeatAnimationDir = "beat";
+//  private final static String kRoleModelPkgDir = "model_pkg_android";
+
+
+  /**
+   * 资源默认路径
+   */
+  // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/metabolt-resource-1.2.0
+  // MainFragment.this.getActivity().getFilesDir().getAbsolutePath()=/data/user/0/com.joyy.metabolt.example/files
+  // getContext().getExternalFilesDir("").getAbsolutePath()=/storage/emulated/0/Android/data/com.joyy.metabolt.example/files
+  private String kStorageDir = "";
+  private final String kAiModelDir = "AI_model";
+  private final String kMusicResDir = "music";
+  private final String kBeatAnimationDir = "beat_animation";
+  private final String kRoleModelPkgDir = "role";
+
 
   private List<String> mMusicFileList = new ArrayList<>();
   private List<String> mBeatAnimationNameList = new ArrayList<>();
+  private List<String> mRoleNameList = new ArrayList<>();
 
   public static MainFragment newInstance() {
     return new MainFragment();
@@ -326,6 +342,29 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
       }
     });
+
+    sp_role_res = view.findViewById(R.id.sp_role_array);
+    sp_role_res.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+
+      @Override
+      public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+        if (null == mRoleNameList
+            || 0 == mRoleNameList.size()
+            || position == mRoleIdx
+            || mMetaServiceState != MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT)
+        {
+          showInnerToast("MetaBolt已初始化,请在初始化之前调用!");
+          return;
+        }
+        Log.i(TAG, "sp_role_res position:" + position + ", id:" + id);
+        mRoleIdx = position;
+      }
+
+      @Override
+      public void onNothingSelected(AdapterView<?> parent) {
+
+      }
+    });
   }
 
   @Override
@@ -334,6 +373,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     mViewModel = new ViewModelProvider(this).get(MainViewModel.class);
     // TODO: Use the ViewModel
 
+    // /storage/emulated/0/Android/data/com.joyy.metabolt.example/files/
+    kStorageDir = getContext().getExternalFilesDir("").getAbsolutePath() + File.separator;
+    Log.i(TAG, "kStorageDir:" + kStorageDir);
     copyResource();
     initMetaService();
   }
@@ -1182,7 +1224,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
               return;
             }
             MetaBoltManager.instance().createAvatarView(context, 0);
-            String modelPath = getRoleModelPath(kRoleModelFemale);
+            String modelPath = getRoleModelPath(/*kRoleModelFemale*/mRoleIdx);
             MetaBoltManager.instance().createAvatarRole(modelPath, UserConfig.kMetaUid);
             Log.i(TAG, "local view path:" + modelPath);
             MetaBoltManager.instance().setRoleIndex(0, UserConfig.kMetaUid);
@@ -1213,7 +1255,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
   private void initRemoteMetaView(Context context) {
     MetaBoltManager.instance().createAvatarView(context, 1);
-    String modelPath = getRoleModelPath(kRoleModelMale);
+    String modelPath = getRoleModelPath(/*kRoleModelMale*/mRoleIdx + 1);
     MetaBoltManager.instance().createAvatarRole(modelPath, mRemoteUid);
     MetaBoltManager.instance().setRoleIndex(1, mRemoteUid);
     MetaBoltManager.instance().setAvatarViewType(mRemoteUid, mAvatarViewType);
@@ -1612,57 +1654,60 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   // 拷贝资源操作
   private String getConfigJsonFile() {
     // targetDir="/data/user/0/com.joyy.metabolt.example/files"
-    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath();
-    return targetDir + kConfigJsonFileName;
+    return kStorageDir + kAiModelDir + File.separator + kConfigJsonFileName;
   }
 
   private String getNewBeatDownPath() {
-    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String template = mMusicFileList.get(mMusicIdx);
     String fileDir = template.substring(0, template.indexOf("."));
-    return targetDir + kDanceMusicDir + File.separator + fileDir + File.separator + fileDir + ".bin";
+    return kStorageDir + kMusicResDir + File.separator + fileDir + File.separator + fileDir + ".bin";
   }
 
   private String getNewDanceDownPath() {
-    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String template = mMusicFileList.get(mMusicIdx);
     String fileDir = template.substring(0, template.indexOf("."));
-    return targetDir + kDanceMusicDir + File.separator + fileDir + File.separator + fileDir + ".dat";
+    return kStorageDir + kMusicResDir + File.separator + fileDir + File.separator + fileDir + ".dat";
   }
 
   private String getAnimationDownPath() {
-    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String template = mBeatAnimationNameList.get(mBeatIdx);
-    return targetDir +  "beat" + File.separator + template + File.separator + template;
+    return kStorageDir + kBeatAnimationDir + File.separator + template + File.separator + template;
   }
 
   private String getRemoteAnimationDownPath() {
-    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String template = mBeatAnimationNameList.get(mBeatIdx);
-    return targetDir +  "beat" + File.separator + template + File.separator + template;
+    return kStorageDir + kBeatAnimationDir + File.separator + template + File.separator + template;
+  }
+
+  private String getRoleModelPath(int index) {
+    int tempIdx = index;
+    if (index >= mRoleNameList.size()) {
+      tempIdx = 0;
+    }
+    String template = mRoleNameList.get(tempIdx);
+    String targetPath = kRoleModelPkgDir + File.separator + template + ".json";
+    return kStorageDir + targetPath;
   }
 
   private String getRoleModelPath(String roleName) {
-    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
-    String targetPath = "model_pkg_android" + File.separator + roleName + ".json";
-    return targetDir + targetPath;
+    String targetPath = kRoleModelPkgDir + File.separator + roleName + ".json";
+    return kStorageDir + targetPath;
   }
 
   private String getMusicPath() {
-    String targetDir = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath() + File.separator;
     String fileName = mMusicFileList.get(mMusicIdx);
     String fileDir = fileName.substring(0, fileName.indexOf("."));
-    return targetDir + kDanceMusicDir + File.separator + fileDir + File.separator + fileName;
+    return kStorageDir + kMusicResDir + File.separator + fileDir + File.separator + fileName;
   }
 
   private void copyResource() {
-    String path = Objects.requireNonNull(getActivity()).getFilesDir().getAbsolutePath();
-    String targetDir = path + File.separator;
-    copyFilesFromAssets(kLipSyncFileName, targetDir + kLipSyncFileName);
+    String targetDir = kStorageDir;
+    //copyFilesFromAssets(kLipSyncFileName, targetDir + kLipSyncFileName);
     //共用kLipSyncFileName目录和config.json
-    copyFilesFromAssets(kFaceSyncFileName, targetDir + kLipSyncFileName);
+    //copyFilesFromAssets(kFaceSyncFileName, targetDir + kLipSyncFileName);
     // 拷贝其他资源
-    copyFilesFromAssets(kDanceMusicDir, targetDir + kDanceMusicDir);
+    copyFilesFromAssets(kAiModelDir, targetDir + kAiModelDir);
+    copyFilesFromAssets(kMusicResDir, targetDir + kMusicResDir);
     copyFilesFromAssets(kBeatAnimationDir, targetDir + kBeatAnimationDir);
     copyFilesFromAssets(kRoleModelPkgDir, targetDir + kRoleModelPkgDir);
 
@@ -1681,6 +1726,14 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     ArrayAdapter<String> beatAdapter = new ArrayAdapter(getContext(), android.R.layout.simple_spinner_item, beatItems);
     beatAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
     sp_beat_res.setAdapter(beatAdapter);
+
+    String[] roleItems = new String[mRoleNameList.size()];
+    for (int i = 0; i < mRoleNameList.size(); i ++) {
+      roleItems[i] = mRoleNameList.get(i);
+    }
+    ArrayAdapter<String> roleAdapter = new ArrayAdapter(getContext(), android.R.layout.simple_spinner_item, roleItems);
+    roleAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    sp_role_res.setAdapter(roleAdapter);
   }
 
   private void copyFilesFromAssets(String assetsPath, String savePath) {
@@ -1725,11 +1778,16 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     // 拷贝文件
     String filename = savePath + "/" + saveName;
     File file = new File(filename);
-    if (assetName.startsWith(kDanceMusicDir) && saveName.endsWith(".mp3")) {
+    if (assetName.startsWith(kMusicResDir) && saveName.endsWith(".mp3")) {
       mMusicFileList.add(saveName);
     } else if (assetName.startsWith(kBeatAnimationDir)) {
       if (saveName.equals("handup") || saveName.equals("jump") || saveName.equals("singing")) {
         mBeatAnimationNameList.add(saveName);
+      }
+    } else if (assetName.startsWith(kRoleModelPkgDir)) {
+      if (saveName.endsWith(".json")) {
+        String roleName = saveName.substring(0, saveName.indexOf('.'));
+        mRoleNameList.add(roleName);
       }
     }
 
