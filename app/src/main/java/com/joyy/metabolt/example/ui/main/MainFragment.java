@@ -109,6 +109,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
   private final int MUSIC_PLAY_STATE_STOPPED = 0; // 伴奏播放停止状态
   private final int MUSIC_PLAY_STATE_STARTING = 1; // 伴奏播放开始状态
+  private final int MUSIC_PLAY_TYPE_DANCE = 0; // 跳舞伴奏
+  private final int MUSIC_PLAY_TYPE_BEAT = 1; // 节奏伴奏
 
   private IMetaBoltDataHandler mMetaBoltDataHandler = null;
   private boolean mIsRtcInitialized = false;
@@ -117,6 +119,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private int mAvatarViewType = MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_WHOLE; // 默认显示全身
   private int mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;
   private int mMusicPlayingState = MUSIC_PLAY_STATE_STOPPED;
+  private int mMusicPlayType = MUSIC_PLAY_TYPE_DANCE;
   private boolean mIsRemoteMetaViewNeedShow = false;
 
   private RtcEngine mAgoraEngine; // agora声网
@@ -455,6 +458,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       if (Constants.ERR_OK != ret) {
         Log.e(TAG, "startAudioMixing " + musicPath + " failed " + mAgoraEngine.getErrorDescription(ret));
       }
+      mAgoraEngine.adjustAudioMixingVolume(100);
       ret = mAgoraEngine.getAudioFileInfo(musicPath);
       if (Constants.ERR_OK != ret) {
         Log.e(TAG, "getAudioFileInfo " + musicPath + " failed " + mAgoraEngine.getErrorDescription(ret));
@@ -498,6 +502,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         if (mIsUserJoined) {
           mIsUserJoined = false;
           mMusicPlayingState = MUSIC_PLAY_STATE_STOPPED;
+          mMusicPlayType = MUSIC_PLAY_TYPE_DANCE;
           btn_join.setText(getString(R.string.join_channel));
           leaveChannel(false);
 
@@ -522,6 +527,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         if (!mIsUserJoined || MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS != mMetaServiceState) {
           return;
         }
+        mMusicPlayType = MUSIC_PLAY_TYPE_DANCE;
         if (MUSIC_PLAY_STATE_STARTING == mMusicPlayingState) {
           playMusic(false);
           btn_music_dance.setText(R.string.start_music_dance);
@@ -542,6 +548,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         if (!mIsUserJoined || MetaBoltTypes.MTBServiceState.MTB_STATE_INIT_SUCCESS != mMetaServiceState) {
           return;
         }
+        mMusicPlayType = MUSIC_PLAY_TYPE_BEAT;
         if (MUSIC_PLAY_STATE_STARTING == mMusicPlayingState) {
           playMusic(false);
           btn_music_beat.setText(R.string.start_music_beat);
@@ -747,10 +754,15 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           /**Clear render view
            Note: The video will stay at its last frame, to completely remove it you will need to
            remove the SurfaceView from its parent*/
+          mAgoraEngine.setupRemoteVideo(new VideoCanvas(null, Constants.RENDER_MODE_HIDDEN, uid));
+          if (fl_remote.getChildCount() > 0) {
+            fl_remote.removeAllViews();
+          }
+          fl_remote.setBackgroundColor(R.color.purple_500);
+
           if (null != mMetaBoltDataHandler) {
             mMetaBoltDataHandler.onUserOffline(String.valueOf(uid), 0);
           }
-          mAgoraEngine.setupRemoteVideo(new VideoCanvas(null, Constants.RENDER_MODE_HIDDEN, uid));
           MetaBoltManager.instance().destroyAvatarRole(mRemoteUid);
           MetaBoltManager.instance().destroyAvatarView(1);
           mRemoteUid = null;
@@ -841,6 +853,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       switch (state) {
         case io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING: {
           mMusicPlayingState = MUSIC_PLAY_STATE_STARTING;
+          mAgoraEngine.adjustAudioMixingPlayoutVolume(100);
           MetaBoltManager.instance().enableAudioPlayStatus(true);
           break;
         }
@@ -858,8 +871,32 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         default:
           break;
       }
+      updateUIMusicPlayingState();
     }
   };
+
+  private void updateUIMusicPlayingState() {
+    switch (mMusicPlayingState) {
+      case MUSIC_PLAY_STATE_STOPPED: {
+        if (MUSIC_PLAY_TYPE_DANCE == mMusicPlayType) {
+          btn_music_dance.setText(R.string.start_music_dance);
+        } else {
+          btn_music_beat.setText(R.string.start_music_beat);
+        }
+        break;
+      }
+      case MUSIC_PLAY_STATE_STARTING: {
+        if (MUSIC_PLAY_TYPE_DANCE == mMusicPlayType) {
+          btn_music_dance.setText(R.string.stop_music_dance);
+        } else {
+          btn_music_beat.setText(R.string.stop_music_beat);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
 
   private void joinAgoraChannel(Context context) {
     int localUid = Integer.valueOf(UserConfig.kMetaUid);
@@ -960,9 +997,19 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     if (mAgoraEngine != null) {
       mAgoraEngine.stopAudioMixing();
       mAgoraEngine.stopPreview();
+      //mAgoraEngine.setupLocalVideo(new VideoCanvas(null, Constants.RENDER_MODE_HIDDEN, Integer.parseInt(UserConfig.kMetaUid)));
+      if (fl_local.getChildCount() > 0) {
+        fl_local.removeAllViews();
+      }
+      fl_local.setBackgroundColor(R.color.teal_700);
       mAgoraEngine.leaveChannel();
+
       if (null != mRemoteUid) {
         mAgoraEngine.setupRemoteVideo(new VideoCanvas(null, Constants.RENDER_MODE_HIDDEN, Integer.valueOf(mRemoteUid)));
+        if (fl_remote.getChildCount() > 0) {
+          fl_remote.removeAllViews();
+        }
+        fl_remote.setBackgroundColor(R.color.purple_500);
       }
       if (isDeInit) {
         mMainLooperHandler.post(RtcEngine::destroy);
@@ -1393,7 +1440,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       }
     }
 
-    Log.i(TAG, "AudioMixing music progress position:" + pos);
+    // Log.i(TAG, "AudioMixing music progress position:" + pos);
     return pos;
   }
 
@@ -1418,7 +1465,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       }
     }
 
-    Log.i(TAG, "AudioMixing music progress total:" + duration);
+    // Log.i(TAG, "AudioMixing music progress total:" + duration);
     return duration;
   }
 
@@ -1428,7 +1475,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   TRTCCloudListener.TRTCAudioFrameListener trtcAudioFrameListener = new TRTCCloudListener.TRTCAudioFrameListener() {
     @Override
     public void onCapturedRawAudioFrame(TRTCCloudDef.TRTCAudioFrame audioFrame) {
-      Log.i(TAG, "trtc onCapturedRawAudioFrame audio sampleRate:" + audioFrame.sampleRate + ", channel:" + audioFrame.channel);
+      // Log.i(TAG, "trtc onCapturedRawAudioFrame audio sampleRate:" + audioFrame.sampleRate + ", channel:" + audioFrame.channel);
       if (null != mMetaBoltDataHandler) {
         mMetaBoltDataHandler.handlerCaptureAudioData(audioFrame.data, audioFrame.data.length, audioFrame.sampleRate, audioFrame.channel, true);
       }
@@ -1462,8 +1509,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
     @Override
     public int onProcessVideoFrame(TRTCCloudDef.TRTCVideoFrame srcFrame, TRTCCloudDef.TRTCVideoFrame dstFrame) {
-      Log.i(TAG, "trtc onProcessVideoFrame srcFrame:" + srcFrame.width + "*" + srcFrame.height + ", pixelFormat:" +
-          srcFrame.pixelFormat + ", rotation:" + srcFrame.rotation);
+      //Log.i(TAG, "trtc onProcessVideoFrame srcFrame:" + srcFrame.width + "*" + srcFrame.height + ", pixelFormat:" +
+      //    srcFrame.pixelFormat + ", rotation:" + srcFrame.rotation);
       int width = srcFrame.width;
       int height = srcFrame.height;
 
@@ -1589,9 +1636,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       mMainLooperHandler.post(new Runnable() {
         @Override
         public void run() {
-          /**Clear render view
-           Note: The video will stay at its last frame, to completely remove it you will need to
-           remove the SurfaceView from its parent*/
           if (null != mMetaBoltDataHandler) {
             mMetaBoltDataHandler.onUserOffline(mRemoteUid, 0);
           }
@@ -1631,17 +1675,19 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     @Override
     public void onStart(int i, int i1) {
       mMusicPlayingState = MUSIC_PLAY_STATE_STARTING;
+      updateUIMusicPlayingState();
       MetaBoltManager.instance().enableAudioPlayStatus(true);
     }
 
     @Override
-    public void onPlayProgress(int i, long l, long l1) {
-
+    public void onPlayProgress(int id, long curPtsMs, long durationMs) {
+      //Log.i(TAG, "trtc play music progress id:" + id + ", curPtsMs:" + curPtsMs + ", durationMs:" + durationMs);
     }
 
     @Override
     public void onComplete(int i, int i1) {
       mMusicPlayingState = MUSIC_PLAY_STATE_STOPPED;
+      updateUIMusicPlayingState();
       MetaBoltManager.instance().enableAudioPlayStatus(false);
     }
   };
