@@ -95,7 +95,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private static final Integer BIT_PER_SAMPLE = 16;
   private static final Integer SAMPLES_PER_CALL = 4410;
 
-
   private boolean mIsUserJoined = false;
   private String mRemoteUid = null;
 
@@ -120,6 +119,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private int mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;
   private int mMusicPlayingState = MUSIC_PLAY_STATE_STOPPED;
   private int mMusicPlayType = MUSIC_PLAY_TYPE_DANCE;
+  private long mMusicDuration = 0L;
   private boolean mIsRemoteMetaViewNeedShow = false;
 
   private RtcEngine mAgoraEngine; // agora声网
@@ -439,6 +439,11 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         break;
       }
     }
+    if (!bPlay) {
+      mMusicDuration = 0L;
+      mMusicPlayingState = MUSIC_PLAY_STATE_STOPPED;
+      MetaBoltManager.instance().enableAudioPlayStatus(false);
+    }
   }
 
   private void trtcPlayMusic(String musicPath, boolean bPlay) {
@@ -448,7 +453,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       mTXAudioEffectManager.startPlayMusic(musicParam);
     } else {
       mTXAudioEffectManager.stopPlayMusic(TRTC_MUSIC_ID);
-      mMusicPlayingState = MUSIC_PLAY_STATE_STOPPED;
     }
   }
 
@@ -530,11 +534,14 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         mMusicPlayType = MUSIC_PLAY_TYPE_DANCE;
         if (MUSIC_PLAY_STATE_STARTING == mMusicPlayingState) {
           playMusic(false);
-          btn_music_dance.setText(R.string.start_music_dance);
           MetaBoltManager.instance().stopMusicDance();
+          btn_music_dance.setText(R.string.start_music_dance);
+          btn_music_beat.setEnabled(true);
         } else {
           playMusic(true);
           btn_music_dance.setText(R.string.stop_music_dance);
+          btn_music_beat.setEnabled(false);
+
           String danceMusicPath = getNewDanceDownPath();
           if (danceMusicPath.isEmpty() || !FileUtils.isFileExists(danceMusicPath)) {
             showInnerToast("Resource dance music file not download, please wait...");
@@ -551,11 +558,13 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         mMusicPlayType = MUSIC_PLAY_TYPE_BEAT;
         if (MUSIC_PLAY_STATE_STARTING == mMusicPlayingState) {
           playMusic(false);
-          btn_music_beat.setText(R.string.start_music_beat);
           MetaBoltManager.instance().stopMusicBeat();
+          btn_music_beat.setText(R.string.start_music_beat);
+          btn_music_dance.setEnabled(true);
         } else {
           playMusic(true);
           btn_music_beat.setText(R.string.stop_music_beat);
+          btn_music_dance.setEnabled(false);
 
           String beatPath = getNewBeatDownPath();
           if (beatPath.isEmpty() || !FileUtils.isFileExists(beatPath)) {
@@ -572,13 +581,11 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   }
 
   private void requestToken() {
-//    CommonUtil.hideInputBoard(getActivity(), et_uid);
-//    CommonUtil.hideInputBoard(getActivity(), et_channel);
     // call when join button hit
     String uid = et_uid.getText().toString();
     String channelId = et_channel.getText().toString();
     if (uid.isEmpty() || channelId.isEmpty()) {
-      showInnerToast("uid或者channelId不能为空!");
+      showInnerToast("uid or channelId cannot be empty!");
       return;
     }
     UserConfig.kMetaUid = uid;
@@ -600,18 +607,18 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       case METABOLT_INIT_TYPE_AGORA: {
         if (0 == code && token != null) {
           UserConfig.kAgoraToken = token;
-          showInnerToast("Agora token request success");
+          showInnerToast("agora token request success");
         } else {
-          showInnerToast("Agora token request failed, code:" + code + ", msg:" + extra);
+          showInnerToast("agora token request failed, code:" + code + ", msg:" + extra);
         }
         break;
       }
       case METABOLT_INIT_TYPE_TRTC: {
         if (0 == code && token != null) {
           UserConfig.kTRTCToken = token;
-          showInnerToast("TRTC token request success");
+          showInnerToast("trtc token request success");
         } else {
-          showInnerToast("TRTC token request failed, code:" + code + ", msg:" + extra);
+          showInnerToast("trtc token request failed, code:" + code + ", msg:" + extra);
         }
         break;
       }
@@ -645,8 +652,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
      * Error code: https://docs.agora.io/en/Voice/API%20Reference/java/classio_1_1agora_1_1rtc_1_1_i_rtc_engine_event_handler_1_1_error_code.html*/
     @Override
     public void onError(int err) {
-      Log.e(TAG, String.format("onError code %d message %s", err, RtcEngine.getErrorDescription(err)));
-      //showAlert(String.format("onError code %d message %s", err, RtcEngine.getErrorDescription(err)));
+      Log.e(TAG, String.format("agora onError code %d message %s", err, RtcEngine.getErrorDescription(err)));
+      //showAlert(String.format("agora onError code %d message %s", err, RtcEngine.getErrorDescription(err)));
     }
 
     /**Occurs when a user leaves the channel.
@@ -655,8 +662,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     @Override
     public void onLeaveChannel(RtcStats stats) {
       super.onLeaveChannel(stats);
-      Log.i(TAG, String.format("local user %s leaveChannel!", UserConfig.kMetaUid));
-      showInnerToast(String.format("local user %s leaveChannel!", UserConfig.kMetaUid));
+      Log.i(TAG, String.format("agora local user %s leaveChannel!", UserConfig.kMetaUid));
+      showInnerToast(String.format("agora local user %s leaveChannel!", UserConfig.kMetaUid));
       mIsUserJoined = false;
 
       if (null != mMetaBoltDataHandler) {
@@ -672,8 +679,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
      * @param elapsed Time elapsed (ms) from the user calling joinChannel until this callback is triggered*/
     @Override
     public void onJoinChannelSuccess(String channel, int uid, int elapsed) {
-      Log.i(TAG, String.format("Agora joinChannel success channel:%s uid:%d", channel, uid));
-      showInnerToast(String.format("Agora joinChannel success channel:%s uid:%d", channel, uid));
+      Log.i(TAG, String.format("agora joinChannel success channel:%s uid:%d", channel, uid));
+      showInnerToast(String.format("agora joinChannel success channel:%s uid:%d", channel, uid));
       mIsUserJoined = true;
       mMainLooperHandler.post(new Runnable() {
         @Override
@@ -702,8 +709,12 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     @Override
     public void onUserJoined(int uid, int elapsed) {
       super.onUserJoined(uid, elapsed);
-      Log.i(TAG, "onUserJoined->" + uid);
-      showInnerToast(String.format("remote user %d joined!", uid));
+      if (null != mRemoteUid) {
+        showInnerToast(String.format("agora remote user %d rejected!", uid));
+        return;
+      }
+      Log.i(TAG, "agora onUserJoined->" + uid);
+      showInnerToast(String.format("agora remote user %d joined!", uid));
       /**Check if the context is correct*/
       Context context = getContext();
       if (context == null) {
@@ -746,8 +757,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
      *               the host to the audience.*/
     @Override
     public void onUserOffline(int uid, int reason) {
-      Log.i(TAG, String.format("remote user %d offline! reason:%d", uid, reason));
-      showInnerToast(String.format("remote user %d offline! reason:%d", uid, reason));
+      Log.i(TAG, String.format("agora remote user %d offline! reason:%d", uid, reason));
+      if (String.valueOf(uid) != mRemoteUid) return;
+      showInnerToast(String.format("agora remote user %d offline! reason:%d", uid, reason));
       mMainLooperHandler.post(new Runnable() {
         @Override
         public void run() {
@@ -849,7 +861,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
     @Override
     public void onAudioMixingStateChanged(int state, int reason) {
-      Log.d(TAG, "onAudioMixingStateChanged state:" + state + ", reason:" + RtcEngine.getErrorDescription(reason));
+      Log.d(TAG, "agora onAudioMixingStateChanged state:" + state + ", reason:" + reason + ", " + RtcEngine.getErrorDescription(reason));
       switch (state) {
         case io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING: {
           mMusicPlayingState = MUSIC_PLAY_STATE_STARTING;
@@ -858,14 +870,10 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           break;
         }
         case io.agora.rtc2.Constants.AUDIO_MIXING_STATE_STOPPED:
-        case io.agora.rtc2.Constants.AUDIO_MIXING_STATE_FAILED: {
-          mMusicPlayingState = MUSIC_PLAY_STATE_STOPPED;
-          MetaBoltManager.instance().enableAudioPlayStatus(false);
-          break;
-        }
+        case io.agora.rtc2.Constants.AUDIO_MIXING_STATE_FAILED:
         case io.agora.rtc2.Constants.AUDIO_MIXING_STATE_COMPLETED: {
           mMusicPlayingState = MUSIC_PLAY_STATE_STOPPED;
-          MetaBoltManager.instance().stopMusicDance();
+          MetaBoltManager.instance().enableAudioPlayStatus(false);
           break;
         }
         default:
@@ -876,26 +884,36 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   };
 
   private void updateUIMusicPlayingState() {
-    switch (mMusicPlayingState) {
-      case MUSIC_PLAY_STATE_STOPPED: {
-        if (MUSIC_PLAY_TYPE_DANCE == mMusicPlayType) {
-          btn_music_dance.setText(R.string.start_music_dance);
-        } else {
-          btn_music_beat.setText(R.string.start_music_beat);
+    mMainLooperHandler.post(() -> {
+      Log.i(TAG, ((mMetaboltInitType == METABOLT_INIT_TYPE_AGORA) ? "agora" : "trtc") +
+          " mMusicPlayingState:" + mMusicPlayingState + ", mMusicPlayType:" + mMusicPlayType);
+      switch (mMusicPlayingState) {
+        case MUSIC_PLAY_STATE_STOPPED: {
+          if (MUSIC_PLAY_TYPE_DANCE == mMusicPlayType) {
+            btn_music_dance.setText(R.string.start_music_dance);
+            MetaBoltManager.instance().stopMusicDance();
+          } else {
+            btn_music_beat.setText(R.string.start_music_beat);
+            MetaBoltManager.instance().stopMusicBeat();
+          }
+          btn_music_dance.setEnabled(true);
+          btn_music_beat.setEnabled(true);
+          break;
         }
-        break;
-      }
-      case MUSIC_PLAY_STATE_STARTING: {
-        if (MUSIC_PLAY_TYPE_DANCE == mMusicPlayType) {
-          btn_music_dance.setText(R.string.stop_music_dance);
-        } else {
-          btn_music_beat.setText(R.string.stop_music_beat);
+        case MUSIC_PLAY_STATE_STARTING: {
+          if (MUSIC_PLAY_TYPE_DANCE == mMusicPlayType) {
+            btn_music_dance.setText(R.string.stop_music_dance);
+            btn_music_beat.setEnabled(false);
+          } else {
+            btn_music_beat.setText(R.string.stop_music_beat);
+            btn_music_dance.setEnabled(false);
+          }
+          break;
         }
-        break;
+        default:
+          break;
       }
-      default:
-        break;
-    }
+    });
   }
 
   private void joinAgoraChannel(Context context) {
@@ -1168,7 +1186,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private final IAudioFrameObserver audioFrameObserver = new IAudioFrameObserver() {
     @Override
     public boolean onRecordFrame(AudioFrame audioFrame) {
-      Log.i(TAG, "onRecordAudioFrame " + audioFrame.toString());
+      //Log.i(TAG, "onRecordAudioFrame " + audioFrame.toString());
       int length = audioFrame.samples.limit();
       byte[] buffer = new byte[length];
       audioFrame.samples.get(buffer);
@@ -1391,7 +1409,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     byteBuffer.get(buffer);
     int type = buffer[MetaBoltManager.kSEIStartLen];
     int ret = 0;
-    if (MetaBoltManager.kDanceType != type) {
+    // if (MetaBoltManager.kDanceType != type) {
       switch (mMetaboltInitType) {
         case METABOLT_INIT_TYPE_TRTC: {
           if (null == mTRTCCloud) return 0;
@@ -1410,12 +1428,12 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           break;
         }
       }
-    } else {
-      if (needPrint) {
-        needPrint = false;
-        Log.i(TAG, "kDanceType data size bigger than agora sendStreamMessage permitted, need not send to remote");
-      }
-    }
+//    } else {
+//      if (needPrint) {
+//        needPrint = false;
+//        Log.i(TAG, "kDanceType data size bigger than agora sendStreamMessage permitted, need not send to remote");
+//      }
+//    }
     buffer = null;
     return ret;
   }
@@ -1426,7 +1444,11 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     long pos = 0;
     switch (mMetaboltInitType) {
       case METABOLT_INIT_TYPE_TRTC: {
-        pos = mTXAudioEffectManager.getMusicCurrentPosInMS(TRTC_MUSIC_ID);
+        if (MUSIC_PLAY_STATE_STOPPED == mMusicPlayingState) {
+          pos = mMusicDuration;
+        } else {
+          pos = mTXAudioEffectManager.getMusicCurrentPosInMS(TRTC_MUSIC_ID);
+        }
         break;
       }
       case METABOLT_INIT_TYPE_THUNDERBOLT: {
@@ -1440,18 +1462,21 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       }
     }
 
-    // Log.i(TAG, "AudioMixing music progress position:" + pos);
+    Log.i(TAG, "AudioMixing music progress position:" + pos + ", mMusicPlayingState:" + mMusicPlayingState);
     return pos;
   }
+
 
   @Override
   public long getMusicPlayTotalProgress() {
     //if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING != mAudioMixingState) return 0;
-    long duration = 0L;
+    long preDuration = mMusicDuration;
     switch (mMetaboltInitType) {
       case METABOLT_INIT_TYPE_TRTC: {
-        String musicPath = getMusicPath();
-        duration = mTXAudioEffectManager.getMusicDurationInMS(musicPath);
+        if (0L == mMusicDuration) {
+          String musicPath = getMusicPath();
+          mMusicDuration = mTXAudioEffectManager.getMusicDurationInMS(musicPath);
+        }
         break;
       }
       case METABOLT_INIT_TYPE_THUNDERBOLT: {
@@ -1460,13 +1485,17 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       }
       case METABOLT_INIT_TYPE_AGORA:
       default: {
-        duration = (long)mAgoraEngine.getAudioMixingDuration();
+        if (0L == mMusicDuration) {
+          mMusicDuration = (long) mAgoraEngine.getAudioMixingDuration();
+        }
         break;
       }
     }
 
-    // Log.i(TAG, "AudioMixing music progress total:" + duration);
-    return duration;
+    if (0L == preDuration) {
+      Log.i(TAG, "AudioMixing music progress total:" + mMusicDuration);
+    }
+    return mMusicDuration;
   }
 
 
@@ -1625,13 +1654,18 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
     @Override
     public void onRemoteUserEnterRoom(String userId) {
-      if (null != mRemoteUid && userId != mRemoteUid) return;
+      if (null != mRemoteUid) {
+        showInnerToast(String.format("trtc remote user %s rejected!", userId));
+        return;
+      }
       mRemoteUid = userId;
       showInnerToast(String.format("trtc remote user %s joined!", userId));
     }
 
     @Override
     public void onRemoteUserLeaveRoom(String userId, int reason) {
+      Log.i(TAG, "trtc remote user " + userId + " offline! reason:" + reason);
+      if (userId != mRemoteUid) return;
       showInnerToast(String.format("trtc remote user %s offline! reason:%d", userId, reason));
       mMainLooperHandler.post(new Runnable() {
         @Override
@@ -1675,20 +1709,20 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     @Override
     public void onStart(int i, int i1) {
       mMusicPlayingState = MUSIC_PLAY_STATE_STARTING;
-      updateUIMusicPlayingState();
       MetaBoltManager.instance().enableAudioPlayStatus(true);
+      updateUIMusicPlayingState();
     }
 
     @Override
     public void onPlayProgress(int id, long curPtsMs, long durationMs) {
-      //Log.i(TAG, "trtc play music progress id:" + id + ", curPtsMs:" + curPtsMs + ", durationMs:" + durationMs);
+      Log.i(TAG, "trtc play music progress id:" + id + ", curPtsMs:" + curPtsMs + ", durationMs:" + durationMs);
     }
 
     @Override
     public void onComplete(int i, int i1) {
       mMusicPlayingState = MUSIC_PLAY_STATE_STOPPED;
-      updateUIMusicPlayingState();
       MetaBoltManager.instance().enableAudioPlayStatus(false);
+      updateUIMusicPlayingState();
     }
   };
 

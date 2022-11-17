@@ -201,7 +201,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
 
   public int stopMusicDance() {
     Log.i(TAG, "stopMusicDance");
-    if (null == mMetaBoltSrv) return -1;
+    if (null == mMetaBoltSrv || null == mMetaBoltSrv.getTrackEngine()) return -1;
     int ret = mMetaBoltSrv.getTrackEngine().stopTrackMusicDance();
     mIsOpenDance = false;
     handleSendMediaExtraInfo();
@@ -217,6 +217,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
 
   public int stopMusicBeat() {
     Log.i(TAG, "stopMusicBeat");
+    if (null == mMetaBoltSrv || null == mMetaBoltSrv.getTrackEngine()) return -1;
     int ret = mMetaBoltSrv.getTrackEngine().stopTrackMusicBeat();
     mIsOpenBeat = false;
     handleSendMediaExtraInfo();

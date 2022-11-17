@@ -1,10 +1,6 @@
 package com.joyy.metabolt.example.utils;
 
-import android.app.Activity;
-import android.content.Context;
 import android.util.Base64;
-import android.view.inputmethod.InputMethodManager;
-import android.widget.EditText;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -21,15 +17,9 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * @author cjw
+ * @author gaoshiqiang@joyy.com
  */
 public class CommonUtil {
-
-    public static void hideInputBoard(Activity activity, EditText editText)
-    {
-        InputMethodManager imm = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
-        imm.hideSoftInputFromWindow(editText.getWindowToken(), 0);
-    }
 
     public static byte[] doI420ToNV21(byte[] data, int width, int height) {
         byte[] ret = new byte[data.length];
@@ -57,19 +47,6 @@ public class CommonUtil {
             System.arraycopy(udata, i, ret, total + 2 * i + 1, 1);
         }
         return ret;
-    }
-
-    public static ByteBuffer doI420ToNV21(ByteBuffer ydata, ByteBuffer udata, ByteBuffer vdata, int width, int height) {
-        int total = width * height;
-        ByteBuffer buf = ByteBuffer.allocate(total * 3 / 2);
-        byte[] uByte = udata.array();
-        byte[] vByte = vdata.array();
-        buf.put(ydata);
-        for (int i = 0; i < total / 4; i += 1) {
-            buf.put(vByte, 2 * i, 1);
-            buf.put(uByte, 2 * i + 1, 1);
-        }
-        return buf;
     }
 
     /**
