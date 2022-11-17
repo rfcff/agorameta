@@ -348,12 +348,12 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
       @Override
       public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-        if (null == mRoleNameList
-            || 0 == mRoleNameList.size()
-            || position == mRoleIdx
-            || mMetaServiceState != MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT)
-        {
-          showInnerToast("MetaBolt已初始化,请在初始化之前调用!");
+        if (null == mRoleNameList || 0 == mRoleNameList.size() || position == mRoleIdx) {
+          return;
+        }
+        if (mIsRtcInitialized) {
+          showInnerAlert("MetaBolt已初始化,请在初始化之前调用!");
+          sp_role_res.setSelection(mRoleIdx);
           return;
         }
         Log.i(TAG, "sp_role_res position:" + position + ", id:" + id);
