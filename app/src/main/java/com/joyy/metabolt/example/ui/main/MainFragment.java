@@ -102,10 +102,6 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private final int METABOLT_SYNC_TYPE_AUDIO = 0; // libsync
   private final int METABOLT_SYNC_TYPE_VIDEO = 1; // facesync
 
-  private final int METABOLT_INIT_TYPE_AGORA = 0; // metabolt借用agora通道
-  private final int METABOLT_INIT_TYPE_TRTC = 1; // metabolt借用trtc通道
-  private final int METABOLT_INIT_TYPE_THUNDERBOLT = 3; // metabolt借用thunderbolt通道
-
   private final int MUSIC_PLAY_STATE_STOPPED = 0; // 伴奏播放停止状态
   private final int MUSIC_PLAY_STATE_STARTING = 1; // 伴奏播放开始状态
   private final int MUSIC_PLAY_TYPE_DANCE = 0; // 跳舞伴奏
@@ -113,7 +109,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
   private IMetaBoltDataHandler mMetaBoltDataHandler = null;
   private boolean mIsRtcInitialized = false;
-  private int mMetaboltInitType = METABOLT_INIT_TYPE_AGORA;
+  private int mMetaboltInitType = UserConfig.METABOLT_INIT_TYPE_AGORA;
   private int mMetaSyncType = METABOLT_SYNC_TYPE_AUDIO;
   private int mAvatarViewType = MetaBoltTypes.MTBAvatarViewType.MTB_AVATAR_VIEW_TYPE_WHOLE; // 默认显示全身
   private int mMetaServiceState = MetaBoltTypes.MTBServiceState.MTB_STATE_NOT_INIT;
@@ -215,9 +211,9 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       public void onCheckedChanged(RadioGroup group, int checkedId) {
         if (mIsRtcInitialized) {
           showInnerToast("RTC is initialized, cannot change now!!");
-          if (METABOLT_INIT_TYPE_TRTC == mMetaboltInitType) {
+          if (UserConfig.METABOLT_INIT_TYPE_TRTC == mMetaboltInitType) {
             rb_trtc.setChecked(true);
-          } else if (METABOLT_INIT_TYPE_THUNDERBOLT == mMetaboltInitType) {
+          } else if (UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT == mMetaboltInitType) {
             rb_thunder.setChecked(true);
           } else {
             rb_agora.setChecked(true);
@@ -226,15 +222,15 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         }
         switch (checkedId) {
           case R.id.rb_trtc:
-            mMetaboltInitType = METABOLT_INIT_TYPE_TRTC;
+            mMetaboltInitType = UserConfig.METABOLT_INIT_TYPE_TRTC;
             tv_metabolt_show.setText(getString(R.string.metabolt_type_trtc_desc));
             break;
           case R.id.rb_thunder:
-            mMetaboltInitType = METABOLT_INIT_TYPE_THUNDERBOLT;
+            mMetaboltInitType = UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT;
             tv_metabolt_show.setText(getString(R.string.metabolt_type_thunder_desc));
             break;
           default:
-            mMetaboltInitType = METABOLT_INIT_TYPE_AGORA;
+            mMetaboltInitType = UserConfig.METABOLT_INIT_TYPE_AGORA;
             tv_metabolt_show.setText(getString(R.string.metabolt_type_agora_desc));
             break;
         }
@@ -425,15 +421,15 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       return;
     }
     switch (mMetaboltInitType) {
-      case METABOLT_INIT_TYPE_TRTC: {
+      case UserConfig.METABOLT_INIT_TYPE_TRTC: {
         trtcPlayMusic(musicPath, bPlay);
         break;
       }
-      case METABOLT_INIT_TYPE_THUNDERBOLT: {
+      case UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT: {
         // todo: 添加thunder播放音乐文件实现
         break;
       }
-      case METABOLT_INIT_TYPE_AGORA:
+      case UserConfig.METABOLT_INIT_TYPE_AGORA:
       default: {
         agoraPlayMusic(musicPath, bPlay);
         break;
@@ -507,6 +503,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
           mIsUserJoined = false;
           mMusicPlayingState = MUSIC_PLAY_STATE_STOPPED;
           mMusicPlayType = MUSIC_PLAY_TYPE_DANCE;
+          btn_music_dance.setText(R.string.start_music_dance);
+          btn_music_beat.setText(R.string.start_music_beat);
           btn_join.setText(getString(R.string.join_channel));
           leaveChannel(false);
 
@@ -590,10 +588,10 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     }
     UserConfig.kMetaUid = uid;
     UserConfig.kChannelId = channelId;
-    if (METABOLT_INIT_TYPE_AGORA == mMetaboltInitType) {
+    if (UserConfig.METABOLT_INIT_TYPE_AGORA == mMetaboltInitType) {
       TokenUtils.instance().requestExternalToken(getActivity(),
           UserConfig.kAgoraAppId, UserConfig.kMetaUid, UserConfig.kChannelId, UserConfig.kAgoraCert, mMetaboltInitType, this);
-    } else if (METABOLT_INIT_TYPE_TRTC == mMetaboltInitType) {
+    } else if (UserConfig.METABOLT_INIT_TYPE_TRTC == mMetaboltInitType) {
       TokenUtils.instance().requestExternalToken(getActivity(),
           UserConfig.kTRTCAppId, UserConfig.kMetaUid, UserConfig.kChannelId, UserConfig.kTRTCCert, mMetaboltInitType, this);
     }
@@ -604,7 +602,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   @Override
   public void onRequestTokenResult(int code, int type, String token, String extra) {
     switch (type) {
-      case METABOLT_INIT_TYPE_AGORA: {
+      case UserConfig.METABOLT_INIT_TYPE_AGORA: {
         if (0 == code && token != null) {
           UserConfig.kAgoraToken = token;
           showInnerToast("agora token request success");
@@ -613,7 +611,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         }
         break;
       }
-      case METABOLT_INIT_TYPE_TRTC: {
+      case UserConfig.METABOLT_INIT_TYPE_TRTC: {
         if (0 == code && token != null) {
           UserConfig.kTRTCToken = token;
           showInnerToast("trtc token request success");
@@ -622,7 +620,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         }
         break;
       }
-      case METABOLT_INIT_TYPE_THUNDERBOLT:
+      case UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT:
       default: {
         if (0 == code && token != null) {
           UserConfig.kMetaToken = token;
@@ -885,7 +883,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
   private void updateUIMusicPlayingState() {
     mMainLooperHandler.post(() -> {
-      Log.i(TAG, ((mMetaboltInitType == METABOLT_INIT_TYPE_AGORA) ? "agora" : "trtc") +
+      Log.i(TAG, ((mMetaboltInitType == UserConfig.METABOLT_INIT_TYPE_AGORA) ? "agora" : "trtc") +
           " mMusicPlayingState:" + mMusicPlayingState + ", mMusicPlayType:" + mMusicPlayType);
       switch (mMusicPlayingState) {
         case MUSIC_PLAY_STATE_STOPPED: {
@@ -1100,15 +1098,15 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
   private void leaveChannel(boolean isDeInit) {
     switch (mMetaboltInitType) {
-      case METABOLT_INIT_TYPE_TRTC: {
+      case UserConfig.METABOLT_INIT_TYPE_TRTC: {
         leaveTrtcChannel(isDeInit);
         break;
       }
-      case METABOLT_INIT_TYPE_THUNDERBOLT: {
+      case UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT: {
         // todo: 待添加THUNDERBOLT
         break;
       }
-      case METABOLT_INIT_TYPE_AGORA:
+      case UserConfig.METABOLT_INIT_TYPE_AGORA:
       default: {
         leaveAgoraChannel(isDeInit);
         break;
@@ -1124,15 +1122,15 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     }
 
     switch (mMetaboltInitType) {
-      case METABOLT_INIT_TYPE_TRTC: {
+      case UserConfig.METABOLT_INIT_TYPE_TRTC: {
         joinTrtcChannel(context);
         break;
       }
-      case METABOLT_INIT_TYPE_THUNDERBOLT: {
+      case UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT: {
         // todo: 待添加THUNDERBOLT
         break;
       }
-      case METABOLT_INIT_TYPE_AGORA:
+      case UserConfig.METABOLT_INIT_TYPE_AGORA:
       default: {
         joinAgoraChannel(context);
         break;
@@ -1334,7 +1332,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       return;
     }
     switch (mMetaboltInitType) {
-      case METABOLT_INIT_TYPE_TRTC: {
+      case UserConfig.METABOLT_INIT_TYPE_TRTC: {
         fl_local.setVisibility(View.GONE);
         fl_remote.setVisibility(View.GONE);
         mTrtcLocalView.setVisibility(View.VISIBLE);
@@ -1345,11 +1343,11 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         mTXAudioEffectManager = mTRTCCloud.getAudioEffectManager();
         break;
       }
-      case METABOLT_INIT_TYPE_THUNDERBOLT: {
+      case UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT: {
         Log.e(TAG, "initRTC METABOLT_INIT_TYPE_THUNDERBOLT need to be supported!");
         break;
       }
-      case METABOLT_INIT_TYPE_AGORA:
+      case UserConfig.METABOLT_INIT_TYPE_AGORA:
       default: {
         fl_local.setVisibility(View.VISIBLE);
         fl_remote.setVisibility(View.VISIBLE);
@@ -1411,12 +1409,12 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     int ret = 0;
     // if (MetaBoltManager.kDanceType != type) {
       switch (mMetaboltInitType) {
-        case METABOLT_INIT_TYPE_TRTC: {
+        case UserConfig.METABOLT_INIT_TYPE_TRTC: {
           if (null == mTRTCCloud) return 0;
           mTRTCCloud.sendCustomCmdMsg(TRTC_CMDID, buffer, true, true);
           break;
         }
-        case METABOLT_INIT_TYPE_THUNDERBOLT: {
+        case UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT: {
           break;
         }
         default: {
@@ -1443,7 +1441,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     //if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING != mAudioMixingState) return 0;
     long pos = 0;
     switch (mMetaboltInitType) {
-      case METABOLT_INIT_TYPE_TRTC: {
+      case UserConfig.METABOLT_INIT_TYPE_TRTC: {
         if (MUSIC_PLAY_STATE_STOPPED == mMusicPlayingState) {
           pos = mMusicDuration;
         } else {
@@ -1451,11 +1449,11 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         }
         break;
       }
-      case METABOLT_INIT_TYPE_THUNDERBOLT: {
+      case UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT: {
         // todo:
         break;
       }
-      case METABOLT_INIT_TYPE_AGORA:
+      case UserConfig.METABOLT_INIT_TYPE_AGORA:
       default: {
         pos = mAgoraEngine.getAudioMixingCurrentPosition();
         break;
@@ -1472,18 +1470,18 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     //if (io.agora.rtc2.Constants.AUDIO_MIXING_STATE_PLAYING != mAudioMixingState) return 0;
     long preDuration = mMusicDuration;
     switch (mMetaboltInitType) {
-      case METABOLT_INIT_TYPE_TRTC: {
+      case UserConfig.METABOLT_INIT_TYPE_TRTC: {
         if (0L == mMusicDuration) {
           String musicPath = getMusicPath();
           mMusicDuration = mTXAudioEffectManager.getMusicDurationInMS(musicPath);
         }
         break;
       }
-      case METABOLT_INIT_TYPE_THUNDERBOLT: {
+      case UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT: {
         // todo:
         break;
       }
-      case METABOLT_INIT_TYPE_AGORA:
+      case UserConfig.METABOLT_INIT_TYPE_AGORA:
       default: {
         if (0L == mMusicDuration) {
           mMusicDuration = (long) mAgoraEngine.getAudioMixingDuration();

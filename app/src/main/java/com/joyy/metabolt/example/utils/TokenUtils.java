@@ -20,13 +20,10 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class TokenUtils {
-  private static String TAG = "TokenUtils";
-  private static String URL_V2 = "http://webapi.jocloud.com/webservice/app/v2/auth/genToken";
-  private static String AGORA_URL = "http://avatar-token.duowan.com/avatartoken/agora";
-  private static String TRTC_URL = "http://avatar-token.duowan.com/avatartoken/trtc";
-  private static final int METABOLT_INIT_TYPE_AGORA = 0; // metabolt借用agora通道
-  private static final int METABOLT_INIT_TYPE_TRTC = 1; // metabolt借用trtc通道
-  private static final int METABOLT_INIT_TYPE_THUNDERBOLT = 3; // metabolt借用thunderbolt通道
+  private final String TAG = "TokenUtils";
+  private final String URL_V2 = "http://webapi.jocloud.com/webservice/app/v2/auth/genToken";
+  private final String AGORA_URL = "http://avatar-token.duowan.com/avatartoken/agora";
+  private final String TRTC_URL = "http://avatar-token.duowan.com/avatartoken/trtc";
   private TokenUtils.OnTokenListener mTokenListener;
   private int mReqType;
 
@@ -71,8 +68,7 @@ public class TokenUtils {
           activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-              mTokenListener.onRequestTokenResult(-1, METABOLT_INIT_TYPE_THUNDERBOLT, "", "请求Token失败,请检查网络!");
-              //Toast.makeText(activity, "请求Token失败，请检查网络！", Toast.LENGTH_SHORT).show();
+              mTokenListener.onRequestTokenResult(-1, UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT, "", "请求Token失败,请检查网络!");
             }
           });
         }
@@ -94,8 +90,7 @@ public class TokenUtils {
                 Log.i(TAG,"request token code=" + code + " msg=" + message + " success=" + success);
                 if (code == 0 && success) {
                   String token = object.getString("object");
-                  //UserConfig.kToken = token;
-                  mTokenListener.onRequestTokenResult(0, METABOLT_INIT_TYPE_THUNDERBOLT, token, "success");
+                  mTokenListener.onRequestTokenResult(0, UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT, token, "success");
                   return;
                 } else {
                   UserConfig.kMetaToken = "";
@@ -111,14 +106,13 @@ public class TokenUtils {
               activity.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                  mTokenListener.onRequestTokenResult(-1, METABOLT_INIT_TYPE_THUNDERBOLT, "", "请求Token失败,message:" + errMessage);
-                  //Toast.makeText(activity, "请求Token失败，message = " + errMessage, Toast.LENGTH_SHORT).show();
+                  mTokenListener.onRequestTokenResult(-1, UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT, "", "请求Token失败,message:" + errMessage);
                 }
               });
             }
           } else {
             UserConfig.kMetaToken = "";
-            mTokenListener.onRequestTokenResult(-1, METABOLT_INIT_TYPE_THUNDERBOLT, "", "request token fail code=" + response.code());
+            mTokenListener.onRequestTokenResult(-1, UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT, "", "request token fail code=" + response.code());
             Log.e(TAG, "request token fail code=" + response.code());
           }
         }
@@ -146,7 +140,7 @@ public class TokenUtils {
     try {
       jasonObj.put("appId", appId);
       jasonObj.put("uid", uid);
-      if (METABOLT_INIT_TYPE_AGORA == type) {
+      if (UserConfig.METABOLT_INIT_TYPE_AGORA == type) {
         jasonObj.put("channelName", channelName);
       }
       jasonObj.put("appCertificate", certificate);
@@ -156,7 +150,7 @@ public class TokenUtils {
     }
     Log.i(TAG, "requestExternalToken type:" + type + ", param:" + jasonObj.toString());
     String servUrl = AGORA_URL;
-    if (METABOLT_INIT_TYPE_TRTC == type) {
+    if (UserConfig.METABOLT_INIT_TYPE_TRTC == type) {
       servUrl = TRTC_URL;
     }
     RequestBody body =  RequestBody.create(MediaType.parse("application/json; charset=utf-8"), jasonObj.toString());
@@ -175,7 +169,6 @@ public class TokenUtils {
             @Override
             public void run() {
               mTokenListener.onRequestTokenResult(-1, mReqType, "", "请求Token失败,请检查网络!");
-              //Toast.makeText(activity, "请求Token失败，请检查网络！", Toast.LENGTH_SHORT).show();
             }
           });
         }
@@ -197,11 +190,6 @@ public class TokenUtils {
                 Log.i(TAG,"request token " + mReqType + " code=" + code + " traceId=" + traceId + ", msg=" + message);
                 if (code == 0) {
                   String token = object.getString("token");
-//                  if (METABOLT_INIT_TYPE_TRTC == mReqType) {
-//                    UserConfig.kTRTCToken = token;
-//                  } else {
-//                    UserConfig.kAgoraToken = token;
-//                  }
                   mTokenListener.onRequestTokenResult(0, mReqType, token, "success");
                   return;
                 } else {
@@ -219,7 +207,6 @@ public class TokenUtils {
                 @Override
                 public void run() {
                   mTokenListener.onRequestTokenResult(-1, mReqType, "", "请求Token失败,message:" + errMessage);
-                  //Toast.makeText(activity, "请求Token失败，message = " + errMessage, Toast.LENGTH_SHORT).show();
                 }
               });
             }

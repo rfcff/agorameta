@@ -1,6 +1,10 @@
 package com.joyy.metabolt.example.utils;
 
 public class UserConfig {
+  public static final int METABOLT_INIT_TYPE_AGORA = 0; // metabolt借用agora通道
+  public static final int METABOLT_INIT_TYPE_TRTC = 1; // metabolt借用trtc通道
+  public static final int METABOLT_INIT_TYPE_THUNDERBOLT = 3; // metabolt借用thunderbolt通道
+
   public static String kChannelId = "010242010";
 
   public static String kMetaAppId = "1545517873";
