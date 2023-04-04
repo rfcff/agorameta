@@ -1,0 +1,9 @@
+{
+    "packages":[
+        {
+            "nodeName" : "Lower_btm",
+            "name" : "socks",
+            "path" : "/socks_10011/socks_10011.prefab"
+        }
+    ]
+}

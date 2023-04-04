@@ -1,0 +1,32 @@
+{
+    "modelID": "hago_female",
+    "modelPath": "/model/body/FemaleRole.prefab",
+    "property": {
+    },
+    "package": [
+                {
+                        "name" : "jacket",
+			"packageID" : "jacket_female_10002"
+		},
+		{
+                        "name" : "pants",
+			"packageID" : "pants_female_10001"
+		},
+		{
+                        "name" : "shoes",
+			"packageID" : "shoes_female_10001"
+		},
+		{
+                        "name" : "hair",
+			"packageID" : "hair_female_10001"
+		}
+	]
+}
+
+
+
+
+
+	
+        
+        

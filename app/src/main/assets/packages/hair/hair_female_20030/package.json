@@ -1,0 +1,10 @@
+{
+    "packages":[
+        {
+            "nodeName" : "b_hair_01",
+            "name" : "hair",
+            "meshNodeName" : "hair_female_20030",
+           "path" : "/hair_female_20030/hair_female_20030.prefab"
+        }
+    ]
+}

@@ -1,0 +1,15 @@
+{
+    "packages":[
+        {
+            "nodeName" : "",
+            "name" : "bag",
+            "path" : "/bag_male_20014/bag_male_20014.prefab",
+            "expands":[
+                 {
+                   "key":"bagtype",
+                   "value":"1"
+                 }
+            ]
+        }
+    ]
+}

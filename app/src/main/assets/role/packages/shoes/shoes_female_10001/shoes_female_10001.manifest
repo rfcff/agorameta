@@ -1,0 +1,29 @@
+ManifestFileVersion: 0
+CRC: 3135056583
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 1076d090fa044ef9fa032772747ccdb0
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 4ff05ef4c22e8eeecbab0dce10af408a
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 137
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/material/Roles/Dress/shoes/female/shoes_female_10001/shoes_female_10001.prefab
+Dependencies: []

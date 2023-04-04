@@ -1,0 +1,9 @@
+{
+    "packages":[
+        {
+            "nodeName" : "b_r_arm_02",
+            "name" : "bracelet",
+            "path" : "/bracelet_10001/bracelet_10001.prefab"
+        }
+    ]
+}

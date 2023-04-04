@@ -1,0 +1,10 @@
+{
+    "packages":[
+        {
+            "nodeName" : "",
+            "name" : "makeup_eyebrow",
+            "flag" : 1,
+            "type": 1
+        }
+    ]
+}

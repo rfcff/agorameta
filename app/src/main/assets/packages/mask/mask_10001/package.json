@@ -1,0 +1,9 @@
+{
+    "packages":[
+        {
+            "nodeName" : "b_hair_01",
+            "name" : "mask",
+            "path" : "/mask_10001/mask_10001.prefab"
+        }
+    ]
+}

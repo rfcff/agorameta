@@ -1,0 +1,29 @@
+ManifestFileVersion: 0
+CRC: 2657455659
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 57f887d1d4e47ab327cda1ff8f8fac28
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 4ff05ef4c22e8eeecbab0dce10af408a
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 137
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/material/Roles/Dress/Glove/glove_20035_02/glove_20035_02.prefab
+Dependencies: []

@@ -1,0 +1,9 @@
+{
+    "packages":[
+        {
+            "nodeName" : "Hand",
+            "name" : "glove",
+            "path" : "/glove_20035_01/glove_20035_01.prefab"
+        }
+    ]
+}

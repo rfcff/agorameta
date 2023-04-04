@@ -1,0 +1,9 @@
+{
+    "packages":[
+        {
+            "nodeName" : "Top",
+            "name" : "jacket",
+            "path" : "/jacket_female_10002/jacket_female_10002.prefab"
+        }
+    ]
+}

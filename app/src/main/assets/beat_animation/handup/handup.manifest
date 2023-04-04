@@ -1,0 +1,17 @@
+ManifestFileVersion: 0
+CRC: 2593224302
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: e69b4b8c0de859c866af1a1903b46247
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: c33d3594fb840798e3bd468c6c9d34d3
+HashAppended: 0
+ClassTypes:
+- Class: 74
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/material/Roles/Animation/handup.anim
+Dependencies: []

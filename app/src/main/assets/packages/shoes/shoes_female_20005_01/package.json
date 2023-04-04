@@ -1,0 +1,9 @@
+{
+    "packages":[
+        {
+            "nodeName" : "shoes",
+            "name" : "shoes",
+            "path" : "/shoes_female_20005_01/shoes_female_20005_01.prefab"
+        }
+    ]
+}

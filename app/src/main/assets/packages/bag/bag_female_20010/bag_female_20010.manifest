@@ -1,0 +1,29 @@
+ManifestFileVersion: 0
+CRC: 332938938
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 4b335bd72eb3e7170e92f2aacacdf0d8
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 4ff05ef4c22e8eeecbab0dce10af408a
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 137
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/material/Roles/Dress/Bag/Female/bag_female_20010/bag_female_20010.prefab
+Dependencies: []

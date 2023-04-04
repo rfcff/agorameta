@@ -1,0 +1,31 @@
+ManifestFileVersion: 0
+CRC: 2197836790
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 1614b9bff8fb8a64a062f4cd51336e5a
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 238b6492da2e1de0cebdc9218519a3e5
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/Games/HagoSpace/ArtAssets/New/Roles/Makeup/Output/hair_male_10002_02/hair_male_10002_02.prefab
+Dependencies: []

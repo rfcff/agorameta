@@ -1,0 +1,9 @@
+{
+    "packages":[
+        {
+            "nodeName" : "b_top_01",
+            "name" : "necklace",
+            "path" : "/necklace_10002_01/necklace_10002_01.prefab"
+        }
+    ]
+}

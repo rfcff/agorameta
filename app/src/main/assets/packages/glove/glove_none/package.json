@@ -1,0 +1,9 @@
+{
+    "packages":[
+        {
+            "nodeName" : "Hand",
+            "name" : "glove",
+            "type" : -1
+        }
+    ]
+}

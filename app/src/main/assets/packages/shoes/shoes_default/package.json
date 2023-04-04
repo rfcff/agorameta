@@ -1,0 +1,9 @@
+{
+    "packages":[
+        {
+            "nodeName" : "shoes",
+            "name" : "shoes",
+            "type" : 1
+        }
+    ]
+}

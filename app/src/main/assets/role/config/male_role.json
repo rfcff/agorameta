@@ -1,0 +1,32 @@
+{
+    "modelID": "hago_male",
+    "modelPath": "/model/body/MaleRole.prefab",
+    "property": {
+    },
+    "package": [
+		{
+                        "name" : "jacket",
+			"packageID" : "jacket_male_10005"
+		},
+		{
+                        "name" : "pants",
+			"packageID" : "pants_male_20001"
+		},
+		{
+                        "name" : "shoes",
+			"packageID" : "shoes_male_10001"
+		},
+		{
+                        "name" : "hair",
+			"packageID" : "hair_male_10001"
+		}
+	]
+}
+
+
+
+
+
+	
+        
+        

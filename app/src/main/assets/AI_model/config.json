@@ -1,0 +1,30 @@
+{
+ "property": {
+	"faceShapeConfigPath":"/faceShape_config.json",
+        "faceAttributeConfigPath":"/faceAttribute_config.json"
+    },
+  "models": {
+    "lipsync_bs": "lipsync_bs[1.0.2].vnmodel",
+    "lipsync_head": "lipsync_head[1.0.0].vnmodel",
+    "avatar_face": [
+      "avatar_face0[1.0.0].vnmodel",
+      "avatar_face1[1.0.0].vnmodel",
+      "avatar_face2[1.0.0].vnmodel",
+      "avatar_face3[1.0.0].vnmodel",
+      "avatar_face4[1.0.0].vnmodel",
+      "avatar_face5[1.0.0].vnmodel",
+      "avatar_face6[1.0.0].vnmodel"
+    ],
+    "avatar_expression": [
+      "avatar_expression[1.0.3].vnmodel"
+    ],
+    "avatar_attribute": [
+      "avatar_shape0[1.0.0].vnmodel",
+      "avatar_shape1[1.0.0].vnmodel",
+      "avatar_attribute[1.0.3].vnmodel",
+      "avatar_gender[1.0.0].vnmodel",
+      "avatar_headpose[1.0.3].vnmodel",
+      "hair_segment[1.0.1].vnmodel"
+    ]
+  }
+}

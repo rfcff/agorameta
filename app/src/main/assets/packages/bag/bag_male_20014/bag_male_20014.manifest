@@ -1,0 +1,29 @@
+ManifestFileVersion: 0
+CRC: 4028963429
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 283169c3fff7c66b72b9dc71887185b1
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 4ff05ef4c22e8eeecbab0dce10af408a
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 137
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/material/Roles/Dress/Bag/male/bag_male_20014/bag_male_20014.prefab
+Dependencies: []

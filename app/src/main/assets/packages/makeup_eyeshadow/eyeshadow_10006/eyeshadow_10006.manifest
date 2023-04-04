@@ -1,0 +1,29 @@
+ManifestFileVersion: 0
+CRC: 1677625025
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 9c10bed5fad4bf5fe091c6a586dd5e76
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 3cc5e8bcecae3afdafc44824acb5f013
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/material/Roles/Makeup/Output/eyeshadow_10006/eyeshadow_10006.prefab
+Dependencies: []

@@ -1,0 +1,9 @@
+{
+    "packages":[
+        {
+            "nodeName" : "b_hair_01",
+            "name" : "headwear",
+            "path" : "/headwear_10002/headwear_10002.prefab"
+        }
+    ]
+}

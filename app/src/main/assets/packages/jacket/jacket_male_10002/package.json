@@ -1,0 +1,10 @@
+{
+    "packages":[
+        {
+            "nodeName" : "Top",
+            "name" : "jacket",
+            "meshNodeName" : "jacket_male_10002/jacket_male_10002",
+            "path" : "/jacket_male_10002/jacket_male_10002.prefab"
+        }
+    ]
+}
