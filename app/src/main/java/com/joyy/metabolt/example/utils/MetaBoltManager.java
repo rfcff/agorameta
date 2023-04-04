@@ -103,12 +103,12 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
     if (isAddHandler) {
       mMetaBoltSrv.addMetaBoltObserver(this);
     }
-    mMetaBoltSrv.setLogCallback(this);
+    MetaBoltService.setLogCallback(this);
     int res = mMetaBoltSrv.initWithConfig(config);
     if (res != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
       Log.e(TAG, "init config failed:" + res + ", model path:" + mAIModelPath);
       mMetaBoltSrv.removeMetaBoltObserver(this);
-      mMetaBoltSrv.setLogCallback(null);
+      MetaBoltService.setLogCallback(null);
       mMetaBoltSrv = null;
       return res;
     }
@@ -143,7 +143,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
     if (res != MetaBoltTypes.MTBErrorCode.MTB_ERR_SUCCESS) {
       Log.e(TAG, "uninit metabolt failed: res: " + res);
     }
-    mMetaBoltSrv.setLogCallback(null);
+    MetaBoltService.setLogCallback(null);
     mMetaBoltSrv = null;
     return res;
   }
@@ -441,10 +441,10 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
    *  MetaBolt callback by Hsu
    */
   @Override
-  public void onError(int errCode, String description) {
-    super.onError(errCode, description);
+  public void onError(int errCode, String description, Map<String, String> info) {
+    super.onError(errCode, description, info);
     if (mMetaFragmentHandler.get() != null) {
-      mMetaFragmentHandler.get().onStateMsgCallback(description + ", error code: " + errCode);
+      mMetaFragmentHandler.get().onStateMsgCallback(description + ", error code: " + errCode + ", info: " + info);
     }
   }
 

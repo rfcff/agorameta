@@ -157,6 +157,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private final String kMusicResDir = "music";
   private final String kBeatAnimationDir = "beat_animation";
   private final String kRoleModelPkgDir = "role";
+  private final String kPackagesDir = "packages";
 
 
   private List<String> mMusicFileList = new ArrayList<>();
@@ -1763,7 +1764,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
       tempIdx = 0;
     }
     String template = mRoleNameList.get(tempIdx);
-    String targetPath = kRoleModelPkgDir + File.separator + template + ".json";
+    String targetPath = kRoleModelPkgDir + File.separator + "config" + File.separator + template + ".json";
     return kStorageDir + targetPath;
   }
 
@@ -1788,6 +1789,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     copyFilesFromAssets(kMusicResDir, targetDir + kMusicResDir);
     copyFilesFromAssets(kBeatAnimationDir, targetDir + kBeatAnimationDir);
     copyFilesFromAssets(kRoleModelPkgDir, targetDir + kRoleModelPkgDir);
+    copyFilesFromAssets(kPackagesDir, targetDir + kPackagesDir);
 
     String[] musicItems = new String[mMusicFileList.size()];
     for (int i = 0; i < mMusicFileList.size(); i ++) {
@@ -1863,7 +1865,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         mBeatAnimationNameList.add(saveName);
       }
     } else if (assetName.startsWith(kRoleModelPkgDir)) {
-      if (saveName.endsWith(".json")) {
+      if (saveName.endsWith("role.json")) {
         String roleName = saveName.substring(0, saveName.indexOf('.'));
         mRoleNameList.add(roleName);
       }
