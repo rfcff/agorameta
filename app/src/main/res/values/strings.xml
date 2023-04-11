@@ -19,4 +19,8 @@
     <string name="sync_type_hint">同步类型</string>
     <string name="sync_type_audio">audio</string>
     <string name="sync_type_video">video</string>
+    <string name="start_ai_face">开启AIFace</string>
+    <string name="confirm_ai_face">AIFace确认</string>
+    <string name="switch_makeup">切换妆容</string>
+    <string name="metabolt_ai_face">等待人脸识别中...</string>
 </resources>

@@ -1,6 +1,7 @@
 package com.joyy.metabolt.example.utils;
 
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Color;
 import android.os.Handler;
@@ -12,18 +13,23 @@ import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import com.metabolt.IMTBLogCallback;
 import com.metabolt.MTBAvatarRole;
 import com.metabolt.MTBAvatarView;
 import com.metabolt.MTBFaceEmotion;
+import com.metabolt.MTBFaceShapeInfo;
 import com.metabolt.MTBMusicBeatInfo;
 import com.metabolt.MTBMusicDanceInfo;
+import com.metabolt.MTBPackage;
 import com.metabolt.MTBServiceConfig;
 import com.metabolt.MTBServiceEventHandler;
 import com.metabolt.MTBTrackEngine;
 import com.metabolt.MetaBoltService;
 import com.metabolt.MetaBoltTypes;
+import com.metabolt.facesync.MTBFaceShapeInfoImpl;
 import com.metabolt.impl.MetaBoltServiceImpl;
 
 import java.lang.ref.WeakReference;
@@ -40,9 +46,12 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
     MTBTrackEngine.TrackFaceEmotionHandler,
     MTBTrackEngine.TrackMusicBeatHandler,
     MTBTrackEngine.TrackMusicDanceHandler,
+    MTBTrackEngine.FaceShapePreviewDetectionHandler,
     Handler.Callback {
   private static final String TAG = "MetaBoltManager";
-  public static final int kMaxViewNum = 6;
+  public static final int AVATER_ROLE_MALE = 0;
+  public static final int AVATER_ROLE_FEMALE = 1;
+  private boolean mIsOpenFaceShape = false;
 
   private Handler mHandler = null;
   private final int kHandlerDelayMs = 33; // 需要比25fps稍微快一点，不然发SEI可能会略低一点
@@ -87,6 +96,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
   private MetaBoltService mMetaBoltSrv = null;
 
   // 保存对象
+  private final ConcurrentHashMap<String, Integer> mAvatarGenderMap = new ConcurrentHashMap<>(); // uid -> role， uid对应的role
   private final ConcurrentHashMap<String, MTBAvatarRole> mAvatarRoleMap = new ConcurrentHashMap<>(); // uid -> role， uid对应的role
   private final ConcurrentHashMap<Integer, MTBAvatarView> mAvatarViewMap = new ConcurrentHashMap<>(); // index -> view, 布局index对应的view
 
@@ -135,6 +145,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
       mMetaBoltSrv.destroyAvatarRole(roleEntry.getValue());
     }
 
+    mAvatarGenderMap.clear();
     mAvatarRoleMap.clear();
     mAvatarViewMap.clear();
 
@@ -282,13 +293,21 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
     return 0;
   }
 
-  public int createAvatarRole(String roleModelPath, String uid) {
-    Log.i(TAG, "createAvatarRole path: " + roleModelPath + ", uid: " + uid);
+  /**
+   * 创建avatar角色
+   * @param roleModelPath 模型路径
+   * @param uid 用户uid
+   * @param gender 性别0-男性吗,1-女性
+   * @return
+   */
+  public int createAvatarRole(String roleModelPath, String uid, int gender) {
+    Log.i(TAG, "createAvatarRole path: " + roleModelPath + ", uid: " + uid + ", gender:" + gender);
     MTBAvatarRole role = mMetaBoltSrv.createAvatarRole(roleModelPath, uid);
     if (role == null) {
       Log.e(TAG, "create role failed, path: " + roleModelPath + ", uid: " + uid);
       return -1;
     }
+    mAvatarGenderMap.put(uid, gender);
     mAvatarRoleMap.put(uid, role);
     return 0;
   }
@@ -314,6 +333,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
     MTBAvatarRole role = mAvatarRoleMap.get(uid);
     if (role != null) {
       mAvatarRoleMap.remove(uid);
+      mAvatarGenderMap.remove(uid);
       mMetaBoltSrv.destroyAvatarRole(role);
     }
     return 0;
@@ -360,6 +380,157 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
     MTBAvatarRole role = mAvatarRoleMap.get(uid);
     if (role != null) {
       return role.resetMusicDance();
+    }
+    return -1;
+  }
+
+  private MetaBoltTypes.MTBFaceShapeData mFaceShapeData = null;
+  private void sendVideoDataToFaceShape(MetaBoltTypes.MTBVideoFrame videoFrame, boolean isHorizontalFlip, int rotation) {
+    if (mIsOpenFaceShape) {
+      MetaBoltTypes.MTBFaceShapeData shapeData = MetaBoltTypes.MTBFaceShapeData.createFaceShapeVideoData(
+          videoFrame, isHorizontalFlip, rotation);
+      mMetaBoltSrv.getTrackEngine().applyFaceShapePreviewDetection(shapeData);
+      synchronized (mDataLock) {
+        mFaceShapeData = shapeData;
+      }
+    }
+  }
+
+  private void switchFaceShapeRet(Context context, MTBAvatarRole role, MTBFaceShapeInfo faceShapeInfo, String manModelPath,
+                                  String femaleModelPath, Handler msgHandler, TextView textView) {
+    if (faceShapeInfo.gender != mAvatarGenderMap.get(UserConfig.kMetaUid)) {
+      /* @setIcon 设置对话框图标
+       * @setTitle 设置对话框标题
+       * @setMessage 设置对话框消息提示
+       * setXXX方法返回Dialog对象，因此可以链式设置属性
+       */
+      final AlertDialog.Builder normalDialog =
+          new AlertDialog.Builder(context);
+      normalDialog.setTitle("提示");
+      normalDialog.setMessage("当前识别人物性别跟原始人物性别不同，是否对性能进行切换");
+      normalDialog.setPositiveButton("是",
+          (dialog, which) -> {
+            if (faceShapeInfo.gender == 0) {
+              role.updateModel(manModelPath);
+            }
+            if (faceShapeInfo.gender == 1) {
+              role.updateModel(femaleModelPath);
+            }
+            mAvatarGenderMap.put(UserConfig.kMetaUid, faceShapeInfo.gender);
+            int ret = role.setFaceShapeInfo(faceShapeInfo);
+            if (textView != null) {
+              textView.setText("" + ret);
+            }
+          });
+      normalDialog.setNegativeButton("否",
+          (dialog, which) -> {
+            int ret = role.setFaceShapeInfo(faceShapeInfo);
+            if (textView != null) {
+              textView.setText("" + ret);
+            }
+          });
+      // 显示
+      normalDialog.show();
+    } else {
+      int ret = role.setFaceShapeInfo(faceShapeInfo);
+      if (textView != null) {
+        textView.setText("" + ret);
+      }
+    }
+//
+//    if (msgHandler != null) {
+//      Message message = Message.obtain();
+//      message.what = MetaBoltSdkFragment.MetaBoltUIMsgEvent.UpdateCallbackMsg;
+//      String msg = ((MTBFaceShapeInfoImpl)faceShapeInfo).toString();
+//      Log.i(TAG, "faceShapeConfirm detectFaceShapeFeature msg: %s", msg);
+//      message.obj = msg;
+//      msgHandler.sendMessage(message);
+//    }
+  }
+
+  public void faceShapeConfirm(Context context, TextView textView, String manModelPath, String femaleModelPath, Handler msgHandler) {
+    synchronized (mDataLock) {
+      if (mFaceShapeData != null && mIsOpenFaceShape && mLastLegalType == 1) {
+        Log.i(TAG, "faceShapeConfirm manModelPath =" + manModelPath + ",femaleModelPath ="
+            + femaleModelPath + ", createGender=" + mAvatarGenderMap.get(UserConfig.kMetaUid));
+        MTBAvatarRole role = mAvatarRoleMap.get(UserConfig.kMetaUid);
+        if (role != null) {
+          MTBFaceShapeInfo faceShapeInfo = mMetaBoltSrv.getTrackEngine().detectFaceShapeFeature(mFaceShapeData);
+          if (faceShapeInfo == null) {
+            Log.i(TAG, "faceShapeConfirm detectFaceShapeFeature faceShapeInfo is null");
+            if (textView != null) {
+              textView.setText("" + -1);
+            }
+            Toast.makeText(context, "识别人脸失败，请重试!", Toast.LENGTH_SHORT).show();
+          } else {
+            switchFaceShapeRet(context, role, faceShapeInfo, manModelPath, femaleModelPath, msgHandler, textView);
+          }
+          mFaceShapeData = null;
+        }
+      } else {
+        if (textView != null) {
+          textView.setText("" + -1);
+        }
+      }
+    }
+  }
+
+  private int mLastLegalType = 0; // -1：失败 0：未知 1：成功
+  private final Handler mFaceShapeHandler = new Handler(Looper.getMainLooper());
+  @Override
+  public int onPreviewDetectionResult(boolean enable) {
+    synchronized (mDataLock) {
+      int LegalType = enable ? 1 : -1;
+      if (LegalType != mLastLegalType) {
+        mLastLegalType = LegalType;
+        mFaceShapeHandler.post(() -> {
+          if (mFaceShapeCallback != null) {
+            mFaceShapeCallback.isLegal(enable);
+          }
+        });
+      }
+    }
+    return 0;
+  }
+
+  public int setPackage(String uid, String packageID, String color) {
+    Log.i(TAG, "setPackage uid: " + uid + ", packageID: " + packageID + ",color:" + color);
+    MTBAvatarRole role = mAvatarRoleMap.get(uid);
+    if (role != null) {
+      MTBPackage mtbPackage = new MTBPackage();
+      mtbPackage.packageID = packageID;
+      mtbPackage.color = color;
+      return role.setPackage(mtbPackage);
+    }
+    return -1;
+  }
+
+  public int setExtendPackageDir(String uid, String customExtendPackageDir) {
+    Log.i(TAG, "setExtendPackageDir uid: " + uid + ", customExtendPackageDir:" + customExtendPackageDir);
+    MTBAvatarRole role = mAvatarRoleMap.get(uid);
+    if (role != null) {
+      return role.setExtendPackageDir(customExtendPackageDir);
+    }
+    return -1;
+  }
+
+  public interface FaceShapeCallback {
+    public void isLegal(boolean isLegal);
+  }
+  private FaceShapeCallback mFaceShapeCallback;
+  public int startFaceShapeByCamera(FaceShapeCallback callback) {
+    Log.i(TAG, "startFaceShapeByCamera");
+    mIsOpenFaceShape = true;
+    mFaceShapeCallback = callback;
+    return mMetaBoltSrv.getTrackEngine().startFaceShapePreviewDetection(this::onPreviewDetectionResult);
+  }
+
+  public int stopFaceShape() {
+    Log.i(TAG, "stopFaceShape");
+    if (mIsOpenFaceShape) {
+      mIsOpenFaceShape = false;
+      mFaceShapeCallback = null;
+      return mMetaBoltSrv.getTrackEngine().stopFaceShapePreviewDetection();
     }
     return -1;
   }
@@ -672,14 +843,7 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
       MetaBoltTypes.MTBVideoFrame videoFrame = new MetaBoltTypes.MTBVideoFrame();
       videoFrame.initFromNV21Data(data, width, height);
       mMetaBoltSrv.getTrackEngine().applyVideoData(videoFrame, isHorizontalFlip, rotation);
-
-//            //nv21数据对齐输入测试
-//            nv21BytesAlignTest(data, width, height, isHorizontalFlip, rotation);
-//            //nv21数据多plane输入测试
-//            nv21BytesPlanesTest(data, width, height, isHorizontalFlip, rotation);
-//            //I420数据测试
-//            i420BytesPlanesTest(data, width, height, isHorizontalFlip, rotation);
-//            i420BytesTest(data, width, height, isHorizontalFlip, rotation);
+      sendVideoDataToFaceShape(videoFrame, isHorizontalFlip, rotation);
     }
   }
 

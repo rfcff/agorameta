@@ -1,5 +1,8 @@
 package com.joyy.metabolt.example.ui.main;
 
+import static com.joyy.metabolt.example.utils.MetaBoltManager.AVATER_ROLE_FEMALE;
+import static com.joyy.metabolt.example.utils.MetaBoltManager.AVATER_ROLE_MALE;
+
 import androidx.appcompat.app.AlertDialog;
 import androidx.lifecycle.ViewModelProvider;
 
@@ -80,8 +83,8 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private MainViewModel mViewModel;
   private View mRootView = null;
   private FrameLayout fl_local_meta, fl_local, fl_remote_meta, fl_remote;
-  private TextView tv_metabolt_show;
-  private Button btn_join, btn_init_rtc, btn_music_dance, btn_music_beat;
+  private TextView tv_metabolt_hint;
+  private Button btn_join, btn_init_rtc, btn_music_dance, btn_music_beat, btn_start_ai_face, btn_confirm_ai_face, btn_switch_makeup;
   private RadioGroup bg_rtc_type;
   private RadioButton rb_agora, rb_trtc, rb_thunder;
   private Spinner sp_sync_type, sp_avatar_view_type, sp_music_res, sp_beat_res, sp_role_res;
@@ -149,6 +152,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   /**
    * 资源默认路径
    */
+  // https://test-rtcapm.duowan.cn/apm-admin/video?fileName=MetaBolt/release/android/metabolt-resource-1.5.0.zip
   // /storage/emulated/0/Android/data/yy.com.thunderbolt/files/download/metabolt-resource-1.2.0
   // MainFragment.this.getActivity().getFilesDir().getAbsolutePath()=/data/user/0/com.joyy.metabolt.example/files
   // getContext().getExternalFilesDir("").getAbsolutePath()=/storage/emulated/0/Android/data/com.joyy.metabolt.example/files
@@ -184,24 +188,34 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     btn_init_rtc = view.findViewById(R.id.btn_init_rtc);
     btn_music_dance = view.findViewById(R.id.btn_music_dance);
     btn_music_beat = view.findViewById(R.id.btn_music_beat);
+    btn_start_ai_face = view.findViewById(R.id.btn_start_ai_face);
+    btn_confirm_ai_face = view.findViewById(R.id.btn_confirm_ai_face);
+    btn_switch_makeup = view.findViewById(R.id.btn_switch_makeup);
     btn_join.setOnClickListener(this);
     btn_init_rtc.setOnClickListener(this);
     btn_music_dance.setOnClickListener(this);
     btn_music_beat.setOnClickListener(this);
+    btn_start_ai_face.setOnClickListener(this);
+    btn_confirm_ai_face.setOnClickListener(this);
+    btn_switch_makeup.setOnClickListener(this);
     btn_join.setEnabled(false);
     btn_music_dance.setEnabled(false);
     btn_music_beat.setEnabled(false);
+
     et_uid = view.findViewById(R.id.et_uid);
     et_uid.setText(String.valueOf(ThreadLocalRandom.current().nextInt(100000, 999999)));
     et_channel = view.findViewById(R.id.et_channel);
     et_channel.setText(UserConfig.kChannelId);
+
     fl_local_meta = view.findViewById(R.id.fl_local_meta);
     fl_local = view.findViewById(R.id.fl_local);
+
     mTrtcLocalView = view.findViewById(R.id.trtc_local);
     mTrtcRemoteView = view.findViewById(R.id.trtc_remote);
+
     fl_remote_meta = view.findViewById(R.id.fl_remote_meta);
     fl_remote = view.findViewById(R.id.fl_remote);
-    tv_metabolt_show = view.findViewById(R.id.tv_metabolt_show);
+    tv_metabolt_hint = view.findViewById(R.id.tv_metabolt_hint);
 
     rb_agora = view.findViewById(R.id.rb_agora);
     rb_trtc = view.findViewById(R.id.rb_trtc);
@@ -224,15 +238,15 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         switch (checkedId) {
           case R.id.rb_trtc:
             mMetaboltInitType = UserConfig.METABOLT_INIT_TYPE_TRTC;
-            tv_metabolt_show.setText(getString(R.string.metabolt_type_trtc_desc));
+            //tv_metabolt_hint.setText(getString(R.string.metabolt_type_trtc_desc));
             break;
           case R.id.rb_thunder:
             mMetaboltInitType = UserConfig.METABOLT_INIT_TYPE_THUNDERBOLT;
-            tv_metabolt_show.setText(getString(R.string.metabolt_type_thunder_desc));
+            //tv_metabolt_hint.setText(getString(R.string.metabolt_type_thunder_desc));
             break;
           default:
             mMetaboltInitType = UserConfig.METABOLT_INIT_TYPE_AGORA;
-            tv_metabolt_show.setText(getString(R.string.metabolt_type_agora_desc));
+            //tv_metabolt_hint.setText(getString(R.string.metabolt_type_agora_desc));
             break;
         }
       }
@@ -574,9 +588,146 @@ public class MainFragment extends Fragment implements View.OnClickListener,
         }
         break;
       }
+      case R.id.btn_start_ai_face: {
+        startTrackAIFace();
+        break;
+      }
+      case R.id.btn_confirm_ai_face: {
+        confirmTrackAIFace();
+        break;
+      }
+      case R.id.btn_switch_makeup: {
+        switchTrackAIFace();
+        break;
+      }
       default:
         break;
     }
+  }
+
+  private void startTrackAIFace() {
+    if (!MetaBoltManager.instance().isInit()) {
+      return;
+    } else {
+      if (METABOLT_SYNC_TYPE_AUDIO == mMetaSyncType) {
+        Toast.makeText(getContext(), "当前是音频驱动lipsync,请切换到视频方式!", Toast.LENGTH_SHORT).show();
+        return;
+      }
+      long startTime = System.currentTimeMillis();
+      Log.d(TAG, "startTrackAIFace startTime " + startTime);
+      int ret = 0;
+      // 设置妆容装扮路径目录
+      String customExtendPackageDir = getContext().getExternalFilesDir("").getAbsolutePath();
+      MetaBoltManager.instance().setExtendPackageDir(UserConfig.kMetaUid, customExtendPackageDir);
+      ret = MetaBoltManager.instance().startFaceShapeByCamera(isLegal -> {
+        if (tv_metabolt_hint != null) {
+          if (isLegal) {
+            Log.d(TAG, "startTrackAIFace detect success " + System.currentTimeMillis());
+            tv_metabolt_hint.setText("AIFace识别成功");
+          } else {
+            tv_metabolt_hint.setText("AIFace识别失败\n请对准好脸的位置");
+          }
+        }
+      });
+    }
+  }
+
+  private void confirmTrackAIFace() {
+    String malePath = getRoleModelPath(kRoleModelMale);
+    String femalePath = getRoleModelPath(kRoleModelFemale);
+    MetaBoltManager.instance().faceShapeConfirm(getContext(), tv_metabolt_hint, malePath, femalePath, mMainLooperHandler);
+  }
+
+  private int switchMakeupCount = 0;
+  private int jacketCount = 0;
+  private int pantsCount = 0;
+  private int glassesCount = 0;
+  private int eyebowCount = 0;
+  private int bodyColorCount = 0;
+
+  private String getJacket() {
+    switch (jacketCount++ % 4) {
+      case 1:
+        return "jacket_male_10002";
+      case 2:
+        return "jacket_male_10005";
+      case 3:
+        return "jacket_female_10002";
+      default:
+        return "jacket_female_10003";
+    }
+  }
+
+  private String getPants() {
+    switch (pantsCount++ % 3) {
+      case 1:
+        return "pants_female_10001";
+      case 2:
+        return "pants_female_10002";
+      default:
+        return "pants_male_20001";
+    }
+  }
+
+  private String getGlasses() {
+    switch (glassesCount++ % 3) {
+      case 1:
+        return "glasses_10003";
+      case 2:
+        return "glasses_none";
+      default:
+        return "glasses_10002";
+    }
+  }
+
+  private String getEyebow() {
+    switch (eyebowCount++ % 3) {
+      case 1:
+        return "eyebrow_10004";
+      case 2:
+        return "eyebrow_default";
+      default:
+        return "eyebrow_10005";
+    }
+  }
+
+  private String getBodyColor() {
+    switch (bodyColorCount++ % 3) {
+      case 1:
+        return "bodycolor_10002";
+      case 2:
+        return "bodycolor_default";
+      default:
+        return "bodycolor_10004";
+    }
+  }
+
+  private void switchTrackAIFace() {
+    String packageId;
+    switch (switchMakeupCount++ % 5) {
+      case 0: { // 切换上衣
+        packageId = getJacket();
+        break;
+      }
+      case 1: { // 切换裤子
+        packageId = getPants();
+        break;
+      }
+      case 2: { // 眼镜
+        packageId = getGlasses();
+        break;
+      }
+      case 3: { // 眉毛
+        packageId = getEyebow();
+        break;
+      }
+      default: { // 肤色
+        packageId = getBodyColor();
+        break;
+      }
+    }
+    Log.d(TAG, "switchTrackAIFace packageId:" + packageId);
+    MetaBoltManager.instance().setPackage(UserConfig.kMetaUid, packageId, "");
   }
 
   private void requestToken() {
@@ -1047,7 +1198,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
     audioFormat.channel = SAMPLE_NUM_OF_CHANNEL;
     audioFormat.sampleRate = SAMPLE_RATE;
     audioFormat.samplesPerCall = SAMPLES_PER_CALL;
-    mTRTCCloud.setCapturedRawAudioFrameCallbackFormat(audioFormat);
+    mTRTCCloud.setCapturedAudioFrameCallbackFormat(audioFormat);
     mTRTCCloud.setMixedPlayAudioFrameCallbackFormat(audioFormat);
     mTRTCCloud.setAudioFrameListener(trtcAudioFrameListener);
 
@@ -1289,7 +1440,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
             }
             MetaBoltManager.instance().createAvatarView(context, 0);
             String modelPath = getRoleModelPath(/*kRoleModelFemale*/mRoleIdx);
-            MetaBoltManager.instance().createAvatarRole(modelPath, UserConfig.kMetaUid);
+            MetaBoltManager.instance().createAvatarRole(modelPath, UserConfig.kMetaUid, modelPath.contains(kRoleModelFemale) ? AVATER_ROLE_FEMALE : AVATER_ROLE_MALE);
             Log.i(TAG, "local view path:" + modelPath);
             MetaBoltManager.instance().setRoleIndex(0, UserConfig.kMetaUid);
             MetaBoltManager.instance().setAvatarViewType(UserConfig.kMetaUid, mAvatarViewType);
@@ -1320,7 +1471,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   private void initRemoteMetaView(Context context) {
     MetaBoltManager.instance().createAvatarView(context, 1);
     String modelPath = getRoleModelPath(/*kRoleModelMale*/mRoleIdx + 1);
-    MetaBoltManager.instance().createAvatarRole(modelPath, mRemoteUid);
+    MetaBoltManager.instance().createAvatarRole(modelPath, mRemoteUid, modelPath.contains(kRoleModelFemale) ? AVATER_ROLE_FEMALE : AVATER_ROLE_MALE);
     MetaBoltManager.instance().setRoleIndex(1, mRemoteUid);
     MetaBoltManager.instance().setAvatarViewType(mRemoteUid, mAvatarViewType);
     MetaBoltManager.instance().setAnimation(mRemoteUid, getRemoteAnimationDownPath());
@@ -1502,7 +1653,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   // TRTC实现部分
   TRTCCloudListener.TRTCAudioFrameListener trtcAudioFrameListener = new TRTCCloudListener.TRTCAudioFrameListener() {
     @Override
-    public void onCapturedRawAudioFrame(TRTCCloudDef.TRTCAudioFrame audioFrame) {
+    public void onCapturedAudioFrame(TRTCCloudDef.TRTCAudioFrame audioFrame) {
       // Log.i(TAG, "trtc onCapturedRawAudioFrame audio sampleRate:" + audioFrame.sampleRate + ", channel:" + audioFrame.channel);
       if (null != mMetaBoltDataHandler) {
         mMetaBoltDataHandler.handlerCaptureAudioData(audioFrame.data, audioFrame.data.length, audioFrame.sampleRate, audioFrame.channel, true);
@@ -1526,6 +1677,11 @@ public class MainFragment extends Fragment implements View.OnClickListener,
 
     @Override
     public void onMixedAllAudioFrame(TRTCCloudDef.TRTCAudioFrame trtcAudioFrame) {
+
+    }
+
+    @Override
+    public void onVoiceEarMonitorAudioFrame(TRTCCloudDef.TRTCAudioFrame var1) {
 
     }
   };
@@ -1769,7 +1925,7 @@ public class MainFragment extends Fragment implements View.OnClickListener,
   }
 
   private String getRoleModelPath(String roleName) {
-    String targetPath = kRoleModelPkgDir + File.separator + roleName + ".json";
+    String targetPath = kRoleModelPkgDir + File.separator + "config" + File.separator + roleName + ".json";
     return kStorageDir + targetPath;
   }
 

@@ -11,7 +11,7 @@ android {
         minSdkVersion 22
         targetSdkVersion 29
         versionCode 1
-        versionName "1.5.1"
+        versionName "1.5.2"
         multiDexEnabled true
         ndkVersion "21.3.6528147"
 
@@ -85,6 +85,6 @@ dependencies {
     api 'io.agora.rtc:full-screen-sharing:3.7.0'
     // metabolt library
     implementation "com.hagospacex.metabolt:metabolt-all:1.5.0"
-    implementation "com.rtc.thunder:thunderbolt-fullvideo:3.10.0"
+    implementation "com.rtc.thunder:thunderbolt-fullvideo:3.10.1"
     implementation 'com.tencent.liteav:LiteAVSDK_TRTC:latest.release'
 }
