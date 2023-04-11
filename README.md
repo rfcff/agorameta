@@ -3,11 +3,26 @@ JoyyMeta结合了aroga、rtc框架与JOYY Metabolt，借助agora、trtc音频/�
 
 # JoyyMeta演示
 
-demo初始化界面如下图<br>![trtc_main](https://user-images.githubusercontent.com/18079722/229682779-670b85c4-d5f9-4801-8c20-7ec7040e9977.jpg)<br>
-有四块区域，其中左上角（位置1）显示本地虚拟人画面、右上角（位置2）显示本地摄像头预览画面、左下角（位置3）为远端虚拟人画面、右下角（位置4）为远端视频画面。连麦画面如下图<br>!
+demo初始化界面如下图
+
+![mainpage](https://user-images.githubusercontent.com/18079722/231124101-1f5f4255-5049-4360-824a-b4c99b31e8df.jpg)
+
+有四块区域，其中左上角（位置1）显示本地虚拟人画面、右上角（位置2）显示本地摄像头预览画面、左下角（位置3）为远端虚拟人画面、右下角（位置4）为远端视频画面。连麦画面如下图
+
 ![half](https://user-images.githubusercontent.com/18079722/229736324-694b5da7-5472-46d7-aa4d-80f0ba7ad6eb.jpg)
 ![head](https://user-images.githubusercontent.com/18079722/229736349-cf251785-7afc-436c-93d4-e853adf49096.jpg)
 
+- 开启AIFace
+
+开启AI人脸识别装扮avatar虚拟人像功能，前置条件需要切换到视频驱动识别模式
+
+- AIFace确认
+
+选择一个AI识别的avatar虚拟人像作为开播虚拟人像
+
+- 切换装扮
+
+可以多次点，只枚举切换几个妆容。切换妆容会依次切换上衣、裤子、眼镜、眉毛跟肤色
 
 - handup
 
