@@ -418,24 +418,24 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
             }
             mAvatarGenderMap.put(UserConfig.kMetaUid, faceShapeInfo.gender);
             int ret = role.setFaceShapeInfo(faceShapeInfo);
-            if (textView != null) {
-              textView.setText("" + ret);
-            }
+//            if (textView != null) {
+//              textView.setText("" + ret);
+//            }
           });
       normalDialog.setNegativeButton("否",
           (dialog, which) -> {
             int ret = role.setFaceShapeInfo(faceShapeInfo);
-            if (textView != null) {
-              textView.setText("" + ret);
-            }
+//            if (textView != null) {
+//              textView.setText("" + ret);
+//            }
           });
       // 显示
       normalDialog.show();
     } else {
       int ret = role.setFaceShapeInfo(faceShapeInfo);
-      if (textView != null) {
-        textView.setText("" + ret);
-      }
+//      if (textView != null) {
+//        textView.setText("" + ret);
+//      }
     }
 //
 //    if (msgHandler != null) {
@@ -459,17 +459,13 @@ public class MetaBoltManager extends MTBServiceEventHandler implements  IMTBLogC
           if (faceShapeInfo == null) {
             Log.i(TAG, "faceShapeConfirm detectFaceShapeFeature faceShapeInfo is null");
             if (textView != null) {
-              textView.setText("" + -1);
+              textView.setText("识别人脸失败,请重试!");
             }
-            Toast.makeText(context, "识别人脸失败，请重试!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "识别人脸失败,请重试!", Toast.LENGTH_SHORT).show();
           } else {
             switchFaceShapeRet(context, role, faceShapeInfo, manModelPath, femaleModelPath, msgHandler, textView);
           }
           mFaceShapeData = null;
-        }
-      } else {
-        if (textView != null) {
-          textView.setText("" + -1);
         }
       }
     }
